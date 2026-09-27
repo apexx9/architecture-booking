@@ -1,0 +1,117 @@
+/*
+ * Scroll-driven animation.
+ *
+ * Everything here animates on a scroll/view timeline, which the compositor owns.
+ * There is no scroll listener, no requestAnimationFrame loop and no React state
+ * involved, so scrolling cannot trigger a re-render or block the main thread.
+ *
+ * Every rule is gated twice:
+ *   @supports (animation-timeline: view())  - browsers without scroll timelines
+ *                                             render the *un-animated* end state
+ *                                             (opacity 1, no offset), so content
+ *                                             is never hidden or stuck invisible.
+ *   prefers-reduced-motion: no-preference   - respects the OS setting.
+ */
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    /* ---------- hero: image drifts + scales as the page scrolls ---------- */
+
+    @keyframes hero-drift {
+      from {
+        transform: scale(1);
+      }
+      to {
+        transform: scale(1.15) translate3d(0, -6%, 0);
+      }
+    }
+
+    .scroll-hero-drift {
+      animation: hero-drift linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 100vh;
+      will-change: transform;
+    }
+
+    /* ---------- hero: content lifts away and fades out ---------- */
+
+    @keyframes hero-exit {
+      from {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+      }
+      to {
+        opacity: 0;
+        transform: translate3d(0, -12%, 0);
+      }
+    }
+
+    .scroll-hero-exit {
+      animation: hero-exit linear both;
+      animation-timeline: view();
+      animation-range: exit 0% exit 100%;
+      will-change: transform, opacity;
+    }
+
+    /* ---------- sections: reveal as they scroll into view ---------- */
+
+    @keyframes reveal-up {
+      from {
+        opacity: 0;
+        transform: translate3d(0, 56px, 0);
+      }
+      to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+      }
+    }
+
+    .scroll-reveal {
+      animation: reveal-up linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 55%;
+      will-change: transform, opacity;
+    }
+
+    /* ---------- scroll progress bar ---------- */
+
+    @keyframes progress-grow {
+      from {
+        transform: scaleX(0);
+      }
+      to {
+        transform: scaleX(1);
+      }
+    }
+
+    .scroll-progress {
+      transform-origin: left center;
+      animation: progress-grow linear both;
+      animation-timeline: scroll(root block);
+      will-change: transform;
+    }
+  }
+}
+
+/*
+ * Active-section highlight.
+ *
+ * The observer writes `data-active` straight onto the DOM nodes, so this never
+ * goes through React state and never causes a render. Unlayered rules outrank
+ * Tailwind's layered utilities, so these win without !important.
+ */
+
+.nav-link[data-active="true"] {
+  color: var(--color-foreground);
+  font-weight: 500;
+}
+
+[data-floating="true"] .nav-link[data-active="true"] {
+  color: #fff;
+}
+
+/* The drawer always sits on the dark panel, so it does not follow the float. */
+.nav-link-panel[data-active="true"] {
+  color: #fff;
+  font-weight: 500;
+}
