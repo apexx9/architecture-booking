@@ -44,7 +44,7 @@ const SampleProject: SampleProjectTypes[] = [
     header: "Yellow Suits",
     description:
       "A vibrant architectural statement blending bold color with modern, sophisticated design.",
-    tags: ["Commercial", "Barcelona"],
+    tags: ["Commercial", "Helsinki"],
     exploreRoute: "/projects/#",
     image: "/assets/yellow-suits.png",
   },
