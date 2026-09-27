@@ -19,7 +19,7 @@ const Hero = () => {
           priority
           className="scroll-hero-drift object-cover object-center"
         />
-        {/* Dark overlay */}
+        {/* Dark overlay for text readability */}
         <div className="absolute inset-0 bg-black/50 sm:bg-black/40" />
       </div>
 

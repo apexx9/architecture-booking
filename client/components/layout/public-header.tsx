@@ -21,6 +21,7 @@ const PublicHeader = () => {
   const pathname = usePathname();
   const [isFloating, setIsFloating] = useState(false);
   const [isNavOpen, setIsNavOpen] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
 
   const closeNav = () => setIsNavOpen(false);
   const toggleNav = () => setIsNavOpen((prev) => !prev);
@@ -45,6 +46,37 @@ const PublicHeader = () => {
       else el.removeAttribute("aria-current");
     }
   };
+
+  // High-performance scroll progress tracker for 100% iOS / Apple Safari compatibility
+  useEffect(() => {
+    let rafId: number | null = null;
+
+    const updateScrollProgress = () => {
+      const scrollTop = window.scrollY;
+      const docHeight =
+        document.documentElement.scrollHeight -
+        document.documentElement.clientHeight;
+      const progress = docHeight > 0 ? scrollTop / docHeight : 0;
+      setScrollProgress(progress);
+    };
+
+    const handleScroll = () => {
+      if (rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          updateScrollProgress();
+          rafId = null;
+        });
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    updateScrollProgress(); // Initial check on mount
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, []);
 
   // Observe page sections for active navigation states
   useEffect(() => {
@@ -139,10 +171,11 @@ const PublicHeader = () => {
       data-floating={isFloating ? "true" : "false"}
       className="sticky top-0 z-40"
     >
-      {/* Scroll progress bar */}
+      {/* Scroll progress bar (driven by JS requestAnimationFrame for complete iOS Safari support) */}
       <div
         aria-hidden="true"
-        className="scroll-progress fixed inset-x-0 top-0 z-50 h-[2px] origin-left bg-[#191919] pointer-events-none"
+        style={{ transform: `scaleX(${scrollProgress})` }}
+        className="fixed inset-x-0 top-0 z-50 h-[2px] origin-left bg-[#191919] pointer-events-none transition-transform duration-75 ease-out"
       />
       <div
         className={[
