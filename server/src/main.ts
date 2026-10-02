@@ -27,7 +27,7 @@ async function bootstrap() {
     }),
   );
 
-  await app.listen(appConfig.port);
+  await app.listen(appConfig.port, '0.0.0.0');
 }
 
 void bootstrap();
