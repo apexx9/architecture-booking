@@ -42,16 +42,27 @@ const SERVICES: Service[] = [
 const OurServices = () => {
   return (
     <section
+      id="services"
       data-nav-link="/"
-      className="scroll-reveal relative z-10 -my-10 mx-auto w-full max-w-7xl rounded-3xl bg-white px-6 py-24 sm:px-10"
+      className="relative z-10 -my-10 mx-auto w-full max-w-7xl scroll-mt-24 rounded-3xl bg-white px-6 py-24 sm:px-10"
     >
       <h2 className="text-center text-[13px] font-medium uppercase tracking-[0.2em] text-[#191919]">
-        Our Services
+        <span className="scroll-line-mask">
+          <span>Our Services</span>
+        </span>
       </h2>
 
+      {/*
+        The rows stagger as they enter rather than the whole panel arriving in one
+        block — the sequence reads as a list, which is what it is.
+      */}
       <ul className="mt-20 divide-y divide-black/10">
-        {SERVICES.map((service) => (
-          <li key={service.id}>
+        {SERVICES.map((service, index) => (
+          <li
+            key={service.id}
+            className="scroll-reveal-group"
+            style={{ "--reveal-index": index } as React.CSSProperties}
+          >
             <article className="grid grid-cols-1 gap-6 py-16 md:grid-cols-12 md:gap-8">
               <span className="text-[20px] font-display font-light text-[#191919] md:col-span-2">
                 {String(service.id).padStart(2, "0")}

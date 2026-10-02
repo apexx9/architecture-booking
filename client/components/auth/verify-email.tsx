@@ -93,13 +93,20 @@ function VerifyEmailContent() {
       heroTitle="One step from your workspace"
       heroSubtitle={`Confirm your email to activate your ${APP_NAME} account, then sign in to continue.`}
     >
-      <div className="flex flex-col gap-5 mt-5 sm:mt-6">
+{/*
+        Same three-part rhythm as ForgotPassword: heading pinned to the top,
+        the primary control centred in the leftover space via `flex-1`, the
+        secondary link pinned to the bottom. Without `flex-1` here the whole
+        block hugs the top and the card looks top-heavy next to
+        ForgotPassword, which is the screen it mirrors.
+      */}
+      <div className="mt-5 flex flex-1 flex-col sm:mt-6">
         <div className="flex flex-col">
-          <h1 className="font-medium text-[28px] sm:text-[32px] lg:text-[36px] text-black leading-[1.1] tracking-tight">
+          <h1 className="text-[28px] leading-[1.1] font-medium tracking-tight text-ink sm:text-[32px] lg:text-[36px]">
             {status === "verified" ? "Email verified" : "Verify your email"}
           </h1>
 
-          <p className="text-[13px] sm:text-[14px] lg:text-[15px] text-black/60 mt-1">
+          <p className="mt-1 text-[13px] text-ink-muted sm:text-[14px] lg:text-[15px]">
             {status === "verifying"
               ? "Checking your verification link..."
               : status === "verified"
@@ -111,72 +118,77 @@ function VerifyEmailContent() {
         </div>
 
         {error ? (
-          <p role="alert" className="text-[13px] text-red-500">
+          <p role="alert" className="mt-2 text-[13px] text-danger">
             {error}
           </p>
         ) : null}
 
-        {status === "idle" || status === "failed" ? (
-          <form
-            onSubmit={handleResend}
-            noValidate
-            className="flex flex-col gap-3"
-          >
-            <Input
-              id="resendEmail"
-              name="email"
-              type="email"
-              label="Resend to"
-              autoComplete="email"
-              placeholder="Enter your Email..."
-              value={resendEmail}
-              onChange={(event) => setResendEmail(event.target.value)}
-              error={resendState === "error" ? (resendError ?? undefined) : undefined}
-              disabled={resendState === "sending"}
-            />
-
-            <Button
-              type="submit"
-              variant="default-small"
-              disabled={resendState === "sending"}
-              className="w-full shadow-sm hover:shadow-md transition-shadow duration-200"
+        <div className="flex flex-1 flex-col justify-center py-6">
+          {status === "idle" || status === "failed" ? (
+            <form
+              onSubmit={handleResend}
+              noValidate
+              className="flex flex-col gap-3"
             >
-              {resendState === "sending" ? "Sending..." : "Resend link"}
-            </Button>
+              <Input
+                id="resendEmail"
+                name="email"
+                type="email"
+                label="Resend to"
+                autoComplete="email"
+                placeholder="you@studio.com"
+                value={resendEmail}
+                onChange={(event) => setResendEmail(event.target.value)}
+                error={resendState === "error" ? (resendError ?? undefined) : undefined}
+                disabled={resendState === "sending"}
+              />
 
-            {resendState === "sent" ? (
-              <p role="status" className="text-[13px] text-gray-500">
-                If that address exists, a new link is on its way.
-              </p>
-            ) : null}
-          </form>
-        ) : null}
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                disabled={resendState === "sending"}
+                className="w-full shadow-sm hover:shadow-md transition-shadow duration-200"
+              >
+                {resendState === "sending" ? "Sending..." : "Resend link"}
+              </Button>
 
-        <p className="flex justify-center gap-1 text-[12px] text-gray-600">
-          {status === "verified" ? (
-            <button
+              {resendState === "sent" ? (
+                <p role="status" className="text-[13px] text-ink-muted">
+                  If that address exists, a new link is on its way.
+                </p>
+              ) : null}
+            </form>
+          ) : status === "verified" ? (
+            // The centred slot carries the only remaining action, so the
+            // screen is not left with a small text link as its primary control.
+            <Button
               type="button"
+              variant="primary"
+              size="lg"
+              className="w-full"
               onClick={() => router.replace(buildAuthHref("/login", nextPath))}
-              className="text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors duration-200 font-medium"
             >
               Continue to log in
-            </button>
-          ) : (
-            <>
-              Already verified?{" "}
-              <Link
-                href={buildAuthHref("/login", nextPath)}
-                className="text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors duration-200 font-medium"
-              >
-                Log in here
-              </Link>
-            </>
-          )}
-        </p>
+            </Button>
+          ) : null}
+        </div>
+
+        {status !== "verified" ? (
+          <p className="flex justify-center gap-1 text-[12px] text-ink-muted">
+            Already verified?{" "}
+            <Link
+              href={buildAuthHref("/login", nextPath)}
+              className="font-medium text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-ink"
+            >
+              Log in here
+            </Link>
+          </p>
+        ) : null}
       </div>
     </AuthShell>
   );
-}
+};
 
 const VerifyEmail = () => {
   return (

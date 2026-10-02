@@ -16,6 +16,7 @@ import {
 } from "@/components/auth/auth-shell";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { sanitizeNextPath } from "@/lib/auth/redirect";
+import { oauthStartUrl } from "@/lib/auth/oauth";
 import { useAuth } from "@/hooks/use-auth";
 import { registerSchema } from "@/schema/auth.schema";
 import { APP_NAME } from "@/utils/utils";
@@ -109,38 +110,37 @@ const SignUp = () => {
       >
         {/* Heading */}
         <div className="flex flex-col">
-          <h1 className="font-medium text-[28px] sm:text-[32px] lg:text-[36px] text-black leading-[1.1] tracking-tight">
+          <h1 className="text-[28px] leading-[1.1] font-medium tracking-tight text-ink sm:text-[32px] lg:text-[36px]">
             Create account
           </h1>
-          <p className="text-[13px] sm:text-[14px] lg:text-[15px] text-black/60 mt-1">
+          <p className="mt-1 text-[13px] text-ink-muted sm:text-[14px] lg:text-[15px]">
             Join {APP_NAME} in a few seconds.
           </p>
         </div>
 
         {/* Social row */}
         <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-          <SocialButton label="Sign up with Google" disabled>
+          <SocialButton href={oauthStartUrl("google")} label="Sign up with Google">
             <GoogleIcon />
           </SocialButton>
           <SocialButton label="Sign up with Apple" disabled>
             <AppleIcon />
           </SocialButton>
-          <SocialButton label="Sign up with Microsoft" disabled>
+          <SocialButton
+            href={oauthStartUrl("microsoft")}
+            label="Sign up with Microsoft"
+          >
             <MicrosoftIcon />
           </SocialButton>
         </div>
 
-        <p className="-mt-2 text-center text-[11px] text-gray-400">
-          Social sign-up is coming soon.
-        </p>
-
         {/* Divider */}
         <div className="flex items-center gap-3">
-          <div className="flex-1 h-px bg-gray-200" />
-          <span className="text-[9px] sm:text-[10px] uppercase tracking-[0.14em] text-gray-400 font-medium whitespace-nowrap">
+          <div className="h-px flex-1 bg-line" />
+          <span className="text-[9px] font-medium tracking-[0.14em] whitespace-nowrap text-ink-subtle uppercase sm:text-[10px]">
             or sign up with email
           </span>
-          <div className="flex-1 h-px bg-gray-200" />
+          <div className="h-px flex-1 bg-line" />
         </div>
 
         {/* Inputs */}
@@ -150,7 +150,7 @@ const SignUp = () => {
             name="fullName"
             label="Full name"
             autoComplete="name"
-            placeholder="Enter your full name..."
+            placeholder="Ama Mensah"
             value={fullName}
             onChange={(event) => setFullName(event.target.value)}
             error={fieldErrors.fullName}
@@ -162,7 +162,7 @@ const SignUp = () => {
             type="email"
             label="Email"
             autoComplete="email"
-            placeholder="Enter your Email..."
+            placeholder="you@studio.com"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             error={fieldErrors.email}
@@ -174,7 +174,7 @@ const SignUp = () => {
             type="password"
             label="Password"
             autoComplete="new-password"
-            placeholder="Create a password..."
+            placeholder="At least 8 characters"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             error={fieldErrors.password}
@@ -186,7 +186,7 @@ const SignUp = () => {
             type="password"
             label="Confirm password"
             autoComplete="new-password"
-            placeholder="Re-enter your password..."
+            placeholder="Repeat your password"
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
             error={fieldErrors.confirmPassword}
@@ -207,14 +207,14 @@ const SignUp = () => {
                 I agree to the{" "}
                 <Link
                   href="/legal/terms"
-                  className="text-gray-800 underline underline-offset-2 hover:text-black transition-colors duration-200"
+                  className="text-ink underline underline-offset-2 transition-colors duration-150 hover:text-ink-muted"
                 >
                   Terms
                 </Link>{" "}
                 and{" "}
                 <Link
                   href="/legal/privacy"
-                  className="text-gray-800 underline underline-offset-2 hover:text-black transition-colors duration-200"
+                  className="text-ink underline underline-offset-2 transition-colors duration-150 hover:text-ink-muted"
                 >
                   Privacy Policy
                 </Link>
@@ -223,7 +223,7 @@ const SignUp = () => {
           />
 
           {fieldErrors.terms ? (
-            <p role="alert" className="text-xs text-red-500">
+            <p role="alert" className="text-xs text-danger">
               {fieldErrors.terms}
             </p>
           ) : null}
@@ -231,30 +231,29 @@ const SignUp = () => {
 
         {/* Form-level error */}
         {formError ? (
-          <p role="alert" className="text-[13px] text-red-500">
+          <p role="alert" className="text-[13px] text-danger">
             {formError}
           </p>
         ) : null}
 
         {/* Submit */}
-        <div className="w-full mt-1 transition-transform duration-200 ease-out hover:-translate-y-0.5 active:translate-y-0">
-          <Button
-            type="submit"
-            variant="default-small"
-            disabled={isSubmitting}
-            className="w-full shadow-sm hover:shadow-md transition-shadow duration-200"
-          >
-            {isSubmitting ? "Creating account..." : "Create account"}
-          </Button>
-        </div>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          loading={isSubmitting}
+          className="mt-1 w-full"
+        >
+          {isSubmitting ? "Creating account…" : "Create account"}
+        </Button>
 
-        <p className="flex justify-center gap-1 text-[12px] text-gray-600">
+        <p className="flex justify-center gap-1 text-[12px] text-ink-muted">
           Already a member?{" "}
           <Link
             href={signUpHref}
-            className="text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors duration-200 font-medium"
+            className="font-medium text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-ink"
           >
-            Log in here
+            Log in
           </Link>
         </p>
       </form>

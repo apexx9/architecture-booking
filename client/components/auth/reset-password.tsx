@@ -1,67 +1,166 @@
 "use client";
 
-import React from "react";
+import React, { Suspense, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+
 import ResetImage from "@/public/assets/reset-image.jpg";
 import Input from "@/components/ui/input";
 import Button from "@/components/ui/button";
 import { AuthShell } from "@/components/auth/auth-shell";
+import AuthPending from "@/components/auth/auth-pending";
+import { useAuth } from "@/hooks/use-auth";
+import { getApiErrorMessage } from "@/lib/api/errors";
+import { buildAuthHref } from "@/lib/auth/redirect";
+import { resetPasswordSchema } from "@/schema/auth.schema";
 
-const ResetPassword = () => {
+type FieldErrors = Partial<Record<"password" | "confirmPassword", string>>;
+
+function ResetPasswordContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { resetPassword } = useAuth();
+
+  const token = searchParams.get("token");
+  const nextPath = searchParams.get("next");
+
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const hasToken = token !== null && token !== "";
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setFieldErrors({});
+    setFormError(null);
+
+    if (!hasToken) {
+      setFormError("This reset link is incomplete. Request a new one.");
+
+      return;
+    }
+
+    const parsed = resetPasswordSchema.safeParse({
+      token,
+      password,
+      confirmPassword,
+    });
+
+    if (!parsed.success) {
+      const errors = parsed.error.flatten().fieldErrors;
+
+      setFieldErrors({
+        password: errors.password?.[0],
+        confirmPassword: errors.confirmPassword?.[0],
+      });
+
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await resetPassword(parsed.data);
+
+      // The password is changed but the session is not; send them to log in
+      // again so they are not left with a stale authenticated shell.
+      router.replace(buildAuthHref("/login", nextPath));
+    } catch (error) {
+      setFormError(getApiErrorMessage(error));
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <AuthShell
       heroImage={ResetImage.src}
       heroTitle="Set a new password"
       heroSubtitle="Choose a strong password you haven't used before to keep your account safe."
     >
-      {/* Heading — pinned at top */}
-      <div className="flex flex-col mt-5 sm:mt-6">
-        <h1 className="font-medium text-[28px] sm:text-[32px] lg:text-[36px] text-black leading-[1.1] tracking-tight">
-          New password
-        </h1>
-        <p className="text-[13px] sm:text-[14px] lg:text-[15px] text-black/60 mt-1">
-          Your new password must be at least 8 characters.
-        </p>
-      </div>
-
-      {/* Middle block — centered in remaining space */}
-      <div className="flex-1 flex flex-col justify-center">
-        <div className="flex flex-col gap-5">
-          <div className="flex flex-col gap-3 sm:gap-3.5">
-            <Input
-              label="New password"
-              type="password"
-              placeholder="Enter new password..."
-            />
-            <Input
-              label="Confirm password"
-              type="password"
-              placeholder="Re-enter new password..."
-            />
-          </div>
-
-          <div className="w-full mt-1 transition-transform duration-200 ease-out hover:-translate-y-0.5 active:translate-y-0">
-            <Button
-              variant="default-small"
-              className="w-full shadow-sm hover:shadow-md transition-shadow duration-200"
-            >
-              Reset password
-            </Button>
-          </div>
-
-          <p className="flex justify-center gap-1 text-[12px] text-gray-600">
-            Changed your mind?{" "}
-            <Link
-              href="/login"
-              className="text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors duration-200 font-medium"
-            >
-              Back to login
-            </Link>
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        className="mt-5 flex flex-1 flex-col sm:mt-6"
+      >
+        <div className="flex flex-col">
+          <h1 className="text-[28px] leading-[1.1] font-medium tracking-tight text-ink sm:text-[32px] lg:text-[36px]">
+            New password
+          </h1>
+          <p className="mt-1 text-[13px] text-ink-muted sm:text-[14px] lg:text-[15px]">
+            At least 8 characters, including a letter and a number.
           </p>
         </div>
-      </div>
+
+        <div className="flex flex-1 flex-col justify-center gap-5 py-6">
+          {formError ? (
+            <p role="alert" className="text-[13px] text-danger">
+              {formError}
+            </p>
+          ) : null}
+
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            label="New password"
+            autoComplete="new-password"
+            placeholder="At least 8 characters"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            error={fieldErrors.password}
+            disabled={isSubmitting}
+          />
+
+          <Input
+            id="confirmPassword"
+            name="confirmPassword"
+            type="password"
+            label="Confirm password"
+            autoComplete="new-password"
+            placeholder="Repeat your password"
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+            error={fieldErrors.confirmPassword}
+            disabled={isSubmitting}
+          />
+
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            loading={isSubmitting}
+            className="w-full"
+          >
+            {isSubmitting ? "Updating…" : "Reset password"}
+          </Button>
+        </div>
+
+        <p className="flex justify-center gap-1 text-[12px] text-ink-muted">
+          Changed your mind?{" "}
+          <Link
+            href="/login"
+            className="font-medium text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-ink"
+          >
+            Back to login
+          </Link>
+        </p>
+      </form>
     </AuthShell>
   );
-};
+}
+
+/*
+ * Reading the token suspends. The fallback keeps the form's geometry so the
+ * layout does not jump once the token resolves — `null` left a blank panel.
+ */
+const ResetPassword = () => (
+  <Suspense fallback={<AuthPending />}>
+    <ResetPasswordContent />
+  </Suspense>
+);
 
 export default ResetPassword;

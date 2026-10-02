@@ -221,7 +221,14 @@ export class AuthController {
       secure: this.appConfig.cookieSecure,
       sameSite: this.appConfig.cookieSameSite,
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/auth',
+      /*
+       * Must stay `/`, not `/auth`. `POST /tenants/switch` reads this cookie to
+       * recover the session id so it can persist the new tenantId. Scoping it to
+       * `/auth` meant the browser never sent it there, so the session's tenant was
+       * never updated and the next `/auth/refresh` silently restored the old tenant.
+       * `clearAuthCookies` below must use the same path or the cookie survives logout.
+       */
+      path: '/',
     });
   }
 
@@ -237,7 +244,8 @@ export class AuthController {
       httpOnly: true,
       secure: this.appConfig.cookieSecure,
       sameSite: this.appConfig.cookieSameSite,
-      path: '/auth',
+      // Must match the path in `setAuthCookies`, or logout leaves the cookie behind.
+      path: '/',
     });
     response.clearCookie('csrf_token', {
       httpOnly: false,

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, type FormEvent } from "react";
+import React, { useId, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import LoginImage from "@/public/assets/login-image.jpg";
@@ -17,6 +17,7 @@ import {
 } from "@/components/auth/auth-shell";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { sanitizeNextPath } from "@/lib/auth/redirect";
+import { oauthStartUrl } from "@/lib/auth/oauth";
 import { useAuth } from "@/hooks/use-auth";
 import { useSavedLoginEmail } from "@/hooks/use-saved-login-email";
 import { loginFormSchema } from "@/schema/auth.schema";
@@ -27,6 +28,7 @@ type FieldErrors = Partial<Record<"email" | "password", string>>;
 const Login = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const formErrorId = useId();
 
   const { login } = useAuth();
   const { savedEmail, save, clear } = useSavedLoginEmail();
@@ -44,6 +46,22 @@ const Login = () => {
   const rememberEmail = typedRemember ?? savedEmail !== "";
 
   const nextPath = sanitizeNextPath(searchParams.get("next"));
+
+  // The OAuth callback bounces failures back here with `?error=`. Decode it so
+  // the reason reads as a sentence rather than a URL-encoded string.
+  const oauthError = (() => {
+    const raw = searchParams.get("error");
+
+    if (!raw) {
+      return null;
+    }
+
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  })();
 
   function persistEmail() {
     if (rememberEmail) {
@@ -96,42 +114,54 @@ const Login = () => {
       <form
         onSubmit={handleSubmit}
         noValidate
-        className="flex flex-col gap-4 sm:gap-5 mt-5 sm:mt-6"
+        className="mt-5 flex flex-col gap-4 sm:mt-6 sm:gap-5"
+        aria-describedby={
+          formError || oauthError ? formErrorId : undefined
+        }
       >
         {/* Heading */}
         <div className="flex flex-col">
-          <h1 className="font-medium text-[28px] sm:text-[32px] lg:text-[36px] text-black leading-[1.1] tracking-tight">
+          <h1 className="text-[28px] leading-[1.1] font-medium tracking-tight text-ink sm:text-[32px] lg:text-[36px]">
             Log in
           </h1>
-          <p className="text-[13px] sm:text-[14px] lg:text-[15px] text-black/60 mt-1">
+          <p className="mt-1 text-[13px] text-ink-muted sm:text-[14px] lg:text-[15px]">
             Welcome back to {APP_NAME}.
           </p>
         </div>
 
+        {oauthError && (
+          <p
+            id={formErrorId}
+            role="alert"
+            className="rounded-sm border border-line bg-surface-subtle px-3 py-2 text-[12px] text-ink sm:text-[13px]"
+          >
+            {oauthError}
+          </p>
+        )}
+
         {/* Social row */}
         <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-          <SocialButton label="Continue with Google" disabled>
+          <SocialButton href={oauthStartUrl("google")} label="Continue with Google">
             <GoogleIcon />
           </SocialButton>
           <SocialButton label="Continue with Apple" disabled>
             <AppleIcon />
           </SocialButton>
-          <SocialButton label="Continue with Microsoft" disabled>
+          <SocialButton
+            href={oauthStartUrl("microsoft")}
+            label="Continue with Microsoft"
+          >
             <MicrosoftIcon />
           </SocialButton>
         </div>
 
-        <p className="-mt-2 text-center text-[11px] text-gray-400">
-          Social sign-in is coming soon.
-        </p>
-
         {/* Divider */}
         <div className="flex items-center gap-3">
-          <div className="flex-1 h-px bg-gray-200" />
-          <span className="text-[9px] sm:text-[10px] uppercase tracking-[0.14em] text-gray-400 font-medium whitespace-nowrap">
+          <div className="h-px flex-1 bg-line" />
+          <span className="text-[9px] font-medium tracking-[0.14em] whitespace-nowrap text-ink-subtle uppercase sm:text-[10px]">
             or continue with email
           </span>
-          <div className="flex-1 h-px bg-gray-200" />
+          <div className="h-px flex-1 bg-line" />
         </div>
 
         {/* Inputs */}
@@ -142,7 +172,7 @@ const Login = () => {
             type="email"
             label="Email"
             autoComplete="email"
-            placeholder="Enter your Email..."
+            placeholder="you@studio.com"
             value={email}
             onChange={(event) => setTypedEmail(event.target.value)}
             error={fieldErrors.email}
@@ -154,7 +184,7 @@ const Login = () => {
             type="password"
             label="Password"
             autoComplete="current-password"
-            placeholder="Enter your Password..."
+            placeholder="Your password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             error={fieldErrors.password}
@@ -164,13 +194,17 @@ const Login = () => {
 
         {/* Form-level error */}
         {formError ? (
-          <p role="alert" className="text-[13px] text-red-500">
+          <p
+            id={formErrorId}
+            role="alert"
+            className="text-[13px] text-danger"
+          >
             {formError}
           </p>
         ) : null}
 
         {/* Save ID + Forgot */}
-        <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <Checkbox
             id="save-id"
             name="saveEmail"
@@ -180,25 +214,24 @@ const Login = () => {
           />
           <Link
             href="/forgot-password"
-            className="text-[12px] text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors duration-200"
+            className="text-[12px] text-ink-subtle underline underline-offset-2 transition-colors duration-150 hover:text-ink"
           >
-            Forgot Password?
+            Forgot password?
           </Link>
         </div>
 
         {/* Submit */}
-        <div className="w-full mt-1 transition-transform duration-200 ease-out hover:-translate-y-0.5 active:translate-y-0">
-          <Button
-            type="submit"
-            variant="default-small"
-            disabled={isSubmitting}
-            className="w-full shadow-sm hover:shadow-md transition-shadow duration-200"
-          >
-            {isSubmitting ? "Logging in..." : "Log in"}
-          </Button>
-        </div>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          loading={isSubmitting}
+          className="mt-1 w-full"
+        >
+          {isSubmitting ? "Logging in…" : "Log in"}
+        </Button>
 
-        <p className="flex justify-center gap-1 text-[12px] text-gray-600">
+        <p className="flex justify-center gap-1 text-[12px] text-ink-muted">
           No account yet?{" "}
           <Link
             href={
@@ -206,9 +239,9 @@ const Login = () => {
                 ? "/sign-up"
                 : `/sign-up?next=${encodeURIComponent(nextPath)}`
             }
-            className="text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors duration-200 font-medium"
+            className="font-medium text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-ink"
           >
-            Sign up here
+            Sign up
           </Link>
         </p>
       </form>

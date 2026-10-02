@@ -11,7 +11,7 @@ interface LogoProps {
 }
 
 const Logo = ({ variant, className }: LogoProps) => {
-  const textColor = variant === "dark" ? "text-black" : "text-white";
+  const textColor = variant === "dark" ? "text-ink" : "text-ink-inverse";
 
   return (
     <p className={`font-medium text-[26px] ${textColor} ${className ?? ""}`}>

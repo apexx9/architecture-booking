@@ -1,14 +1,76 @@
 @import "tailwindcss";
 @import "./scroll-animations.css";
 
+/*
+ * Renove colour system.
+ *
+ * Roles only — no component or brand names. Utility names are chosen to read
+ * cleanly in markup: `text-ink`, `bg-surface`, `border-line`.
+ *
+ * Every text value below clears WCAG AA against the surface it sits on:
+ *
+ *   --ink-muted        7.0:1 on canvas
+ *   --ink-subtle       5.3:1 on canvas — lowest text tier still permitted
+ *   --danger           6.6:1 on canvas
+ *   --success          5.0:1 on canvas
+ *   --caution          6.9:1 on canvas
+ *   --ink-inverse-muted  7.0:1 on --foreground
+ *   --line-strong      3.2:1 on canvas, WCAG 1.4.11 control boundary
+ *
+ * Accent is ink, not a hue. Stronger colour is reserved for status.
+ */
 :root {
     --background: #ffffff;
     --foreground: #191919;
+
+    /* Surfaces */
+    --surface: #ffffff;
+    --surface-subtle: #f7f7f6;
+    --surface-sunken: #f1f1f0;
+    --surface-inverse: #191919;
+
+    /* Text */
+    --ink: #191919;
+    --ink-muted: #525252;
+    --ink-subtle: #6b6b6b;
+    --ink-inverse: #ffffff;
+    --ink-inverse-muted: #a3a3a3;
+
+    /* Borders */
+    --line: #e5e5e3;
+    --line-muted: #ededec;
+    --line-strong: #8f8f8f;
+    --line-inverse: rgba(255, 255, 255, 0.14);
+
+    /* Status — always paired with text, never the only cue */
+    --danger: #b42318;
+    --success: #15803d;
+    --caution: #854d0e;
 }
 
 @theme inline {
     --color-background: var(--background);
     --color-foreground: var(--foreground);
+
+    --color-surface: var(--surface);
+    --color-surface-subtle: var(--surface-subtle);
+    --color-surface-sunken: var(--surface-sunken);
+    --color-surface-inverse: var(--surface-inverse);
+
+    --color-ink: var(--ink);
+    --color-ink-muted: var(--ink-muted);
+    --color-ink-subtle: var(--ink-subtle);
+    --color-ink-inverse: var(--ink-inverse);
+    --color-ink-inverse-muted: var(--ink-inverse-muted);
+
+    --color-line: var(--line);
+    --color-line-muted: var(--line-muted);
+    --color-line-strong: var(--line-strong);
+    --color-line-inverse: var(--line-inverse);
+
+    --color-danger: var(--danger);
+    --color-success: var(--success);
+    --color-caution: var(--caution);
 
     --font-sans: var(--font-satoshi);
     --font-display: var(--font-zodiak);
@@ -23,4 +85,131 @@ body {
     background: var(--background);
     color: var(--foreground);
     font-family: var(--font-satoshi);
+    -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * One focus treatment for the whole product: a visible ring that survives on
+ * both the white canvas and the charcoal surface.
+ *
+ * This lives in `@layer base`, not at the top level. Unlayered CSS beats every
+ * layered rule, so an unlayered `:focus-visible` would out-rank Tailwind's
+ * `outline-none` utility — a control that draws its own focus state (the shared
+ * `Input`, where the wrapper border turns ink) would end up with two rings, one
+ * nested inside the other. Base layer means a component can still opt out with
+ * `outline-none` when it provides an equally visible indicator of its own.
+ */
+@layer base {
+    :focus-visible {
+        outline: 2px solid var(--ink);
+        outline-offset: 2px;
+    }
+
+    [data-on-dark] :focus-visible,
+    .on-dark :focus-visible {
+        outline-color: var(--ink-inverse);
+    }
+}
+
+/*
+ * Modal dialog backdrop.
+ *
+ * In `@layer base` so a component can still override the backdrop colour with a
+ * utility if it needs to. `open::backdrop` animates on entry; there is no exit
+ * animation because `<dialog>` leaves the top layer the instant it closes, so
+ * animating out would mean delaying the close, which is worse.
+ */
+@layer base {
+    dialog::backdrop {
+        background-color: rgb(25 25 25 / 0.32);
+    }
+
+    dialog[open]::backdrop {
+        animation: dialog-backdrop-in 150ms ease-out;
+    }
+}
+
+/*
+ * Shared keyframes for the modal and toast primitives. Declared once here rather
+ * than inside the components, so N dialogs do not emit N copies. `@keyframes` are
+ * not subject to cascade layers, so these sit outside `@layer base`.
+ *
+ * `toast-in` is a short rise and fade, so a message reads as arriving from where
+ * it was triggered rather than popping into an unrelated corner. The reduced-motion
+ * guard below floors both durations without removing the state change.
+ */
+@keyframes dialog-backdrop-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/*
+ * Global reduced-motion guard.
+ *
+ * Movement is an enhancement, never the only way something is communicated, so
+ * when a visitor asks for reduced motion we shorten transitions rather than
+ * removing the state change outright — an instant colour swap still reads as a
+ * response, a silent one does not.
+ *
+ * Components can still opt out of specific effects with `motion-safe:`. This
+ * rule only sets a floor.
+ */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        transition-duration: 0.01ms !important;
+        transition-delay: 0ms !important;
+        animation-duration: 0.01ms !important;
+        animation-delay: 0ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/*
+ * Scroll-driven reveal animations are opt-in via `no-preference`, but anchor
+ * navigation must never animate either.
+ */
+@media (prefers-reduced-motion: reduce) {
+    html:focus-within {
+        scroll-behavior: auto;
+    }
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.12);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.2);
 }

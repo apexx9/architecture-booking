@@ -9,6 +9,7 @@ export type SmtpConfig = {
   user?: string;
   password?: string;
   from?: string;
+  fromName?: string;
 };
 
 export type CookieSameSite = 'lax' | 'strict' | 'none';
@@ -34,9 +35,15 @@ export class AppConfigService {
   }
 
   get frontendUrl(): string {
+    /*
+     * Default matches `next dev`'s own default port. The old 3001 default meant a
+     * missing FRONTEND_URL produced a CORS origin nothing was served from, which
+     * fails silently: every credentialed request is blocked and Set-Cookie is
+     * discarded, so auth looks broken with no error in either console.
+     */
     return this.configService.getOrThrow<string>(
       'FRONTEND_URL',
-      'http://localhost:3001',
+      'http://localhost:3000',
     );
   }
 
@@ -69,6 +76,10 @@ export class AppConfigService {
     );
   }
 
+  get brevoApiKey(): string | undefined {
+    return this.configService.get<string>('BREVO_API_KEY')?.trim();
+  }
+
   get smtp(): SmtpConfig {
     return {
       host: this.configService.get<string>('SMTP_HOST'),
@@ -77,7 +88,42 @@ export class AppConfigService {
         : undefined,
       user: this.configService.get<string>('SMTP_USER'),
       password: this.configService.get<string>('SMTP_PASSWORD'),
-      from: this.configService.get<string>('SMTP_FROM'),
+      from: this.configService.get<string>('SMTP_FROM') || 'noreply@renove.app',
+      fromName: this.configService.get<string>('SMTP_FROM_NAME') || 'Renove',
     };
+  }
+
+  get googleClientId(): string | undefined {
+    return this.configService.get<string>('GOOGLE_CLIENT_ID')?.trim();
+  }
+
+  get googleClientSecret(): string | undefined {
+    return this.configService.get<string>('GOOGLE_CLIENT_SECRET')?.trim();
+  }
+
+  get googleCallbackUrl(): string {
+    return (
+      this.configService.get<string>('GOOGLE_CALLBACK_URL') ||
+      `${this.frontendUrl}/auth/google/callback`
+    );
+  }
+
+  get microsoftClientId(): string | undefined {
+    return this.configService.get<string>('MICROSOFT_CLIENT_ID')?.trim();
+  }
+
+  get microsoftClientSecret(): string | undefined {
+    return this.configService.get<string>('MICROSOFT_CLIENT_SECRET')?.trim();
+  }
+
+  get microsoftCallbackUrl(): string {
+    return (
+      this.configService.get<string>('MICROSOFT_CALLBACK_URL') ||
+      `${this.frontendUrl}/auth/microsoft/callback`
+    );
+  }
+
+  get microsoftTenantId(): string {
+    return this.configService.get<string>('MICROSOFT_TENANT_ID') || 'common';
   }
 }

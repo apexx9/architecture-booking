@@ -52,10 +52,7 @@ const SampleProject: SampleProjectTypes[] = [
 
 const SampleProjects = () => {
   return (
-    <section
-      data-nav-link="/templates"
-      className="scroll-reveal w-full py-16 md:py-24 bg-transparent"
-    >
+    <section data-nav-link="/templates" className="w-full bg-transparent py-16 md:py-24">
       <div className="max-w-7xl mx-auto px-6 sm:px-10 flex flex-col gap-12">
         {SampleProject.map((project, index) => {
           const words = project.header.split(" ");
@@ -66,17 +63,24 @@ const SampleProjects = () => {
               className="sticky group/article relative h-[420px] w-full overflow-hidden rounded-[28px] md:h-[520px] md:rounded-[32px] transition-transform duration-500"
               style={{
                 top: `calc(7rem + ${index * 24}px)`,
-              }}
+                /*
+                  Inherited by the image reveal below, so each card's photograph is
+                  uncovered in sequence rather than all at once.
+                */
+                "--reveal-index": index,
+              } as React.CSSProperties}
             >
               {/* Full-bleed image as the card background with smooth zoom */}
-              <Image
-                src={project.image}
-                alt={project.header}
-                fill
-                sizes="100vw"
-                priority={project.id === 1}
-                className="object-cover object-center transition-transform duration-700 ease-out group-hover/article:scale-105"
-              />
+              <div className="scroll-image-reveal absolute inset-0">
+                <Image
+                  src={project.image}
+                  alt={project.header}
+                  fill
+                  sizes="100vw"
+                  priority={project.id === 1}
+                  className="object-cover object-center transition-transform duration-700 ease-out group-hover/article:scale-105"
+                />
+              </div>
 
               {/* Clean, light gradient overlay */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
@@ -118,27 +122,37 @@ const SampleProjects = () => {
 
                   <Link
                     href={project.exploreRoute}
-                    className="shrink-0 rounded-full bg-white px-5 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[#191919] transition-transform duration-300 ease-out hover:scale-[1.04]"
+                    aria-label={`Explore ${project.header}`}
+                    className="shrink-0 rounded-full bg-white px-5 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[#191919] transition-transform duration-300 ease-out hover:scale-[1.04] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
                   >
                     Explore
                   </Link>
                 </div>
               </div>
 
-              {/* Interactive Diagonal Wipe "View" Button (Self-contained hover group) */}
-              <div
-                role="button"
-                aria-label={`View ${project.header}`}
-                className="absolute right-[18%] top-[22%] z-20 group flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#191919] opacity-0 transition-opacity duration-300 ease-out group-hover/article:opacity-100 md:h-20 md:w-20 cursor-pointer shadow-xl"
-              >
-                {/* Diagonal sliding background layer with smoother, slower timing */}
-                <span className="absolute -inset-[100%] translate-x-[-100%] translate-y-[100%] rotate-[-45deg] bg-white transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:translate-x-0 group-hover:translate-y-0" />
+              {/*
+                  Revealed by the diagonal wipe on hover.
 
-                {/* Text with dynamic contrast switching via mix-blend-mode */}
-                <span className="relative z-10 text-[11px] font-medium uppercase tracking-[0.1em] text-white mix-blend-difference">
-                  View
-                </span>
-              </div>
+                  This was a `div[role=button]` with no handler and no tab stop —
+                  unreachable by keyboard, inert on click, and invisible on touch
+                  where there is no hover to reveal it. It is a real link to the
+                  same project as the Explore button, so it is focusable and
+                  operable, and `.micro-reveal-hover` keeps it visible on pointers
+                  that cannot hover.
+                */}
+                <Link
+                  href={project.exploreRoute}
+                  aria-label={`View ${project.header}`}
+                  className="micro-reveal-hover absolute right-[18%] top-[22%] z-20 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#191919] opacity-0 shadow-xl transition-opacity duration-300 ease-out group-hover/article:opacity-100 focus-visible:opacity-100 group-focus-within/article:opacity-100 group-hover/article:shadow-2xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white md:h-20 md:w-20"
+                >
+                  {/* Diagonal sliding background layer with smoother, slower timing */}
+                  <span className="absolute -inset-[100%] translate-x-[-100%] translate-y-[100%] rotate-[-45deg] bg-white transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover/article:translate-x-0 group-hover/article:translate-y-0" />
+
+                  {/* Text with dynamic contrast switching via mix-blend-mode */}
+                  <span className="relative z-10 text-[11px] font-medium uppercase tracking-[0.1em] text-white mix-blend-difference">
+                    View
+                  </span>
+                </Link>
             </article>
           );
         })}

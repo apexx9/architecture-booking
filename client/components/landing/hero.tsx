@@ -1,22 +1,32 @@
 import React from "react";
 import Image from "next/image";
-import HeroImage from "@/public/assets/interior-4.jpg";
+import HeroImage from "@/public/assets/hero-img.jpg";
 import { ArrowRight } from "lucide-react";
 import { APP_NAME, SUPPORT_EMAIL, SUPPORT_PHONE } from "@/utils/utils";
+
+/*
+ * Positions a heading line within its reveal cascade. `motion-design` treats a
+ * stagger as meaningful only when it expresses hierarchy, so this is the whole
+ * mechanism: a hand-picked order, not a computed delay.
+ */
+const line = (index: number) =>
+  ({ "--reveal-index": index }) as React.CSSProperties;
 
 const Hero = () => {
   return (
     <section
       data-nav-link="/"
-      className="relative flex min-h-[100svh] w-full flex-col items-center justify-between overflow-hidden px-5 py-10 sm:min-h-[120dvh] sm:px-10 sm:py-16 md:min-h-[145dvh] lg:min-h-[170dvh] lg:py-20"
+      className="relative flex min-h-[100svh] w-full flex-col items-center justify-between overflow-hidden bg-[#191919] px-5 py-10 sm:min-h-[120dvh] sm:px-10 sm:py-16 md:min-h-[145dvh] lg:min-h-[170dvh] lg:py-20"
     >
-      {/* Background Image locked strictly to the mobile screen viewport */}
-      <div className="absolute inset-0 h-[100svh] sm:h-full w-full overflow-hidden">
+      {/* Background Image locked strictly to the viewport, not the tall section */}
+      <div className="absolute inset-x-0 top-0 h-[100svh] w-full overflow-hidden">
         <Image
           src={HeroImage}
           alt="Interior architectural design"
           fill
           priority
+          sizes="100vw"
+          quality={90}
           className="scroll-hero-drift object-cover object-center"
         />
         {/* Dark overlay for text readability */}
@@ -25,13 +35,23 @@ const Hero = () => {
 
       {/* Main Hero Content */}
       <div className="scroll-hero-exit relative z-10 mx-auto mt-8 flex w-full max-w-5xl flex-col items-center gap-4 text-center sm:mt-20 sm:gap-6 lg:mt-24">
-        {/* Fluid ramp heading */}
+        {/*
+          Fluid ramp heading. The three lines were already hard-broken with
+          <br />, so they are wrapped in scroll-reveal masks rather than split
+          in JS — the visual line count is authored, not measured.
+        */}
         <h1 className="font-medium leading-none tracking-tight text-white text-[clamp(2.2rem,11vw,6rem)]">
-          YOUR
-          <br />
-          <span className="font-display">DREAM</span>
-          <br />
-          PLACE
+          <span className="scroll-line-mask">
+            <span style={line(0)}>YOUR</span>
+          </span>
+          <span className="scroll-line-mask">
+            <span className="font-display" style={line(1)}>
+              DREAM
+            </span>
+          </span>
+          <span className="scroll-line-mask">
+            <span style={line(2)}>PLACE</span>
+          </span>
         </h1>
         <p className="max-w-sm text-pretty font-normal text-[15px] text-white/90 sm:max-w-md sm:text-lg lg:text-xl">
           Designing timeless, luxurious spaces that redefine modern architecture
@@ -41,12 +61,12 @@ const Hero = () => {
 
       {/* Scroll Button */}
       <div className="relative z-10 my-6 sm:my-0 sm:mt-15">
-        <button
-          type="button"
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-[#191919] font-medium text-[10px] text-white shadow-xl transition-transform duration-200 hover:scale-105 hover:bg-[#191919]/90 sm:mr-[120px] sm:h-20 sm:w-20 sm:text-[13px] md:mr-[260px] md:h-24 md:w-24 md:text-[14px] lg:mr-[500px]"
+        <a
+          href="#services"
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-[#191919] font-medium text-[10px] text-white shadow-xl transition-transform duration-200 hover:scale-105 hover:bg-[#191919]/90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white sm:mr-[120px] sm:h-20 sm:w-20 sm:text-[13px] md:mr-[260px] md:h-24 md:w-24 md:text-[14px] lg:mr-[500px]"
         >
           SCROLL
-        </button>
+        </a>
       </div>
 
       {/* Bottom Section */}
@@ -56,7 +76,7 @@ const Hero = () => {
       >
         <div className="flex flex-col items-start gap-3 sm:gap-4">
           <h2 className="max-w-2xl text-left font-medium leading-tight text-white text-[clamp(1.75rem,6vw,4rem)]">
-            We love & live architecture
+            We love &amp; live architecture
           </h2>
           <a
             href="/about"
@@ -64,7 +84,7 @@ const Hero = () => {
           >
             Our Story{" "}
             <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/40 transition-transform duration-300 group-hover:translate-x-2 group-hover:border-white sm:h-12 sm:w-12">
-              <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              <ArrowRight className="micro-arrow w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </span>
           </a>
         </div>

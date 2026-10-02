@@ -1,4 +1,11 @@
-import { pgTable, pgEnum, uuid, varchar, timestamp } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  pgEnum,
+  uuid,
+  varchar,
+  text,
+  timestamp,
+} from 'drizzle-orm/pg-core';
 
 export const userStatusEnum = pgEnum('user_status', [
   'ACTIVE',
@@ -28,6 +35,9 @@ export const users = pgTable('users', {
   emailVerifiedAt: timestamp('email_verified_at', {
     withTimezone: true,
   }),
+  authProvider: varchar('auth_provider', { length: 50 }),
+  providerId: varchar('provider_id', { length: 255 }),
+  avatarUrl: text('avatar_url'),
 
   createdAt: timestamp('created_at', {
     withTimezone: true,

@@ -101,11 +101,53 @@ export class AuthService {
       return user;
     });
 
-    await this.createAndSendVerificationToken(user.id, email);
+    /*
+     * The account now exists, so a failure to send the verification email would
+     * otherwise leave a PENDING user who can never verify and can never log in,
+     * while the client sees an error and retries into a 409. Compensate by
+     * removing what was just created, so "could not email" and "no account" are
+     * the same state and the user can simply try again.
+     *
+     * The token is created before the send so the rollback covers it too.
+     */
+    try {
+      await this.createAndSendVerificationToken(user.id, email);
+    } catch (error) {
+      await this.rollbackRegistration(user.id, tenantId);
+
+      this.logger.error(
+        `Registration rolled back for user ${user.id}: verification email could not be sent.`,
+      );
+
+      throw error;
+    }
 
     this.logger.log(`Registered new user ${user.id}`);
 
     return user;
+  }
+
+  /**
+   * Undoes a registration that could not be completed.
+   *
+   * Memberships and tokens cascade from `users`, and the tenant is only reachable
+   * through the membership, so deleting the user and then the tenant is enough.
+   * Failures here are logged rather than raised: the caller is already throwing
+   * the original, more useful error, and masking it with a cleanup failure would
+   * hide the actual cause.
+   */
+  private async rollbackRegistration(userId: string, tenantId: string) {
+    try {
+      await this.db.db.delete(users).where(eq(users.id, userId));
+      await this.db.db.delete(tenants).where(eq(tenants.id, tenantId));
+    } catch (cleanupError) {
+      this.logger.error(
+        `Failed to roll back registration for user ${userId} and tenant ${tenantId}.`,
+        cleanupError instanceof Error
+          ? cleanupError.stack
+          : String(cleanupError),
+      );
+    }
   }
 
   async login(dto: LoginDto, metadata: SessionMetadata = {}) {
@@ -179,7 +221,16 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
+        /*
+         * Same projection as `getCurrentUser`. The client types this as the full
+         * user and reads `fullName` immediately (workspace user menu, initials),
+         * so returning a partial object left the name blank until a page reload.
+         */
+        fullName: user.fullName,
         status: user.status,
+        emailVerifiedAt: user.emailVerifiedAt,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
       },
 
       session: {
@@ -558,6 +609,142 @@ export class AuthService {
       tenantId,
       type: 'access',
     });
+  }
+
+  async handleOAuthLogin(
+    oauthUser: {
+      email?: string;
+      firstName?: string;
+      lastName?: string;
+      provider?: string;
+      providerId?: string;
+      picture?: string;
+    } | null,
+  ) {
+    const email = oauthUser?.email?.trim().toLowerCase();
+
+    if (!email) {
+      throw new UnauthorizedException(
+        'OAuth provider did not return an email.',
+      );
+    }
+
+    let user = await this.db.db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1)
+      .then((rows) => rows[0]);
+
+    if (!user) {
+      const tenantId = randomUUID();
+      user = await this.db.db.transaction(async (tx) => {
+        const [newUser] = await tx
+          .insert(users)
+          .values({
+            email,
+            fullName:
+              [oauthUser?.firstName, oauthUser?.lastName]
+                .filter(Boolean)
+                .join(' ')
+                .trim() || null,
+            passwordHash: await argon2.hash(randomBytes(32).toString('hex')),
+            status: 'ACTIVE',
+            emailVerifiedAt: new Date(),
+            authProvider: oauthUser!.provider,
+            providerId: oauthUser!.providerId,
+            avatarUrl: oauthUser?.picture,
+          })
+          .returning();
+
+        const [tenant] = await tx
+          .insert(tenants)
+          .values({
+            id: tenantId,
+            name: 'My Practice',
+          })
+          .returning({ id: tenants.id });
+
+        await tx.insert(memberships).values({
+          userId: newUser.id,
+          tenantId: tenant.id,
+          role: 'OWNER',
+          isDefault: true,
+        });
+
+        return newUser;
+      });
+    } else {
+      if (user.status === 'SUSPENDED') {
+        this.logger.warn(`OAuth login denied for suspended user ${user.id}`);
+        throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
+      }
+      await this.db.db
+        .update(users)
+        .set({
+          authProvider: oauthUser!.provider,
+          providerId: oauthUser!.providerId,
+          avatarUrl: oauthUser?.picture || user.avatarUrl,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, user.id));
+    }
+
+    const membershipRows = await this.db.db
+      .select({
+        tenantId: memberships.tenantId,
+        name: tenants.name,
+        role: memberships.role,
+        isDefault: memberships.isDefault,
+      })
+      .from(memberships)
+      .innerJoin(tenants, eq(memberships.tenantId, tenants.id))
+      .where(eq(memberships.userId, user.id))
+      .orderBy(desc(memberships.isDefault), asc(memberships.createdAt));
+
+    if (membershipRows.length === 0) {
+      this.logger.error(`User ${user.id} has no tenant membership`);
+      throw new ForbiddenException('No tenant membership found.');
+    }
+
+    const activeTenant = membershipRows[0];
+    const accessToken = await this.createAccessToken(
+      user.id,
+      activeTenant.tenantId,
+    );
+    const { session, refreshToken } = await this.createSession(
+      user.id,
+      activeTenant.tenantId,
+      {},
+    );
+
+    this.logger.log(
+      `User ${user.id} logged in via OAuth (${oauthUser!.provider})`,
+    );
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        status: user.status,
+        emailVerifiedAt: user.emailVerifiedAt,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
+      session: {
+        id: session.id,
+        expiresAt: session.expiresAt,
+      },
+      tenants: membershipRows.map((row) => ({
+        id: row.tenantId,
+        name: row.name,
+        role: row.role,
+        isDefault: row.isDefault,
+      })),
+    };
   }
 
   private async createAndSendVerificationToken(userId: string, email: string) {

@@ -267,6 +267,7 @@ export class TenantsService {
       .returning({
         userId: memberships.userId,
         role: memberships.role,
+        joinedAt: memberships.createdAt,
       });
 
     this.logger.log(
@@ -277,6 +278,9 @@ export class TenantsService {
       userId: member.userId,
       email,
       role: member.role,
+      // Same shape as a `listMembers` row, so a caller can treat the created
+      // member exactly like a fetched one instead of refetching the list.
+      joinedAt: member.joinedAt,
     };
   }
 

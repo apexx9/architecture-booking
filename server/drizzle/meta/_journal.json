@@ -36,6 +36,41 @@
       "when": 1790421798718,
       "tag": "0004_majestic_golden_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790897957882,
+      "tag": "0005_tranquil_human_robot",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790898762469,
+      "tag": "0006_yellow_vapor",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790902248126,
+      "tag": "0007_ambiguous_slayback",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790909217923,
+      "tag": "0008_classy_captain_marvel",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790950014343,
+      "tag": "0009_easy_albert_cleary",
+      "breakpoints": true
     }
   ]
 }

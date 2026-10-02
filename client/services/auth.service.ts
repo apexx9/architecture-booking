@@ -17,6 +17,15 @@ export const authService = {
 
     useAuthStore.getState().setAuthenticated(response.user);
 
+    /*
+     * The login response already carries the practice list. Storing it here
+     * means the workspace switcher renders on first paint with no extra
+     * round-trip.
+     */
+    if (response.tenants?.length) {
+      useAuthStore.getState().setTenants(response.tenants);
+    }
+
     return response;
   },
 

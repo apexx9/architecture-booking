@@ -8,8 +8,8 @@ interface MarketingLayoutProps {
 }
 
 /**
- * Public, browsable shell. No session required — the auth wall lives at the
- * action level (EngageCta) and inline (AuthWall), not around these routes.
+ * Public, browsable shell. No session required — the conversion point lives at
+ * the action level (EngageCta), not around these routes.
  */
 export default function MarketingLayout({ children }: MarketingLayoutProps) {
   return (
@@ -26,7 +26,9 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
 
       <PublicHeader />
 
-      <main className="flex-1">{children}</main>
+      <main id="main" tabIndex={-1} className="flex-1">
+        {children}
+      </main>
 
       <Footer />
     </div>

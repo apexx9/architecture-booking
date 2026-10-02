@@ -3,7 +3,36 @@
  *
  * compositor-owned animations for desktop & modern mobile browsers (iOS 18+ / Android),
  * with safe graceful degradation for older devices.
+ *
+ * Everything here is native CSS: `animation-timeline` and `@keyframes`. No
+ * animation library is installed, and MOTION.md forbids adding one without
+ * approval, so motion is expressed as compositor-only work (transform/opacity/
+ * clip-path) that the browser runs off the main thread.
+ *
+ * The universal rule for every rule below: the *un*animated state must be the
+ * fully readable, fully usable one. Scroll-driven animations here use `both`
+ * fill deliberately — see the note on `.scroll-reveal` for why the backwards
+ * fill is safe and the forwards fill is not.
  */
+
+/*
+ * Timing tokens. MOTION.md gives ranges, not values; these are the single
+ * chosen point in each band so repeated interactions feel identical.
+ *
+ * Namespaced under `--motion-` on purpose: Tailwind v4's theme already owns
+ * bare `--ease-in` / `--ease-out`, so redefining those here would silently
+ * change the meaning of every `ease-out` utility in the app.
+ */
+:root {
+    --motion-fast: 150ms;
+    --motion-base: 220ms;
+    --motion-slow: 420ms;
+    --motion-reveal: 700ms;
+    /* Decelerating curve for entrances. */
+    --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    /* Accelerating curve for exits. */
+    --motion-ease-in: cubic-bezier(0.55, 0, 1, 0.45);
+}
 
 @media (prefers-reduced-motion: no-preference) {
     @supports (animation-timeline: view()) {
@@ -47,6 +76,17 @@
 
         /* ---------- sections: reveal as they scroll into view ---------- */
 
+        /*
+         * `animation-range: entry 0% entry 55%` means the reveal finishes when the
+         * element is a little over half in view — so by the time a reader is
+         * actually looking at it, it is already settled.
+         *
+         * The `both` fill is safe in the backwards direction only because the
+         * keyframe's `from` state (opacity 0) is fully applied before the element
+         * enters. Nothing is ever hidden once it is on screen, and a browser
+         * without scroll-timeline support skips the whole block, rendering the
+         * element in its natural visible state.
+         */
         @keyframes reveal-up {
             from {
                 opacity: 0;
@@ -64,6 +104,217 @@
             animation-range: entry 0% entry 55%;
             will-change: transform, opacity;
         }
+
+        /*
+         * Staggered children.
+         *
+         * `motion-design` allows a stagger only when it establishes hierarchy —
+         * a cascade that makes the last item feel slow is worse than no cascade.
+         * So the offset is small and capped by the caller, and each child keeps
+         * the same reveal distance as a lone `.scroll-reveal`.
+         *
+         * The stagger shifts `animation-range`, not `animation-delay`: on a
+         * scroll timeline a delay is interpreted against the scroll range and
+         * behaves inconsistently across engines, whereas range offsets are the
+         * mechanism the timeline is defined in terms of.
+         *
+         * Each child keeps its own `view()` timeline, so a card reveals when it
+         * itself comes into view rather than the whole list appearing at once.
+         */
+        .scroll-reveal-group > * {
+            animation: reveal-up linear both;
+            animation-timeline: view();
+            animation-range:
+                entry calc(0% + var(--reveal-index, 0) * 5%)
+                entry calc(55% + var(--reveal-index, 0) * 5%);
+            will-change: transform, opacity;
+        }
+
+        /*
+         * Editorial heading reveal.
+         *
+         * Each line sits in an overflow-hidden mask and slides up from beneath it.
+         * `typography-animation` requires the text stay readable and semantic
+         * throughout, so the mask only hides a line while it is below its resting
+         * position — no characters are ever removed from the DOM, so screen
+         * readers, search engines and text selection all get the whole heading.
+         *
+         * Lines are authored as separate elements by the caller rather than split
+         * in JS: the number of visual lines changes with viewport width, so a JS
+         * split would wrap wrongly and would risk a hydration mismatch.
+         */
+        @keyframes line-reveal {
+            from {
+                transform: translate3d(0, 105%, 0);
+            }
+            to {
+                transform: translate3d(0, 0, 0);
+            }
+        }
+
+        .scroll-line-mask {
+            display: block;
+            overflow: hidden;
+            /*
+             * The mask clips vertically, and these headings use `leading-none`,
+             * so the line box is exactly 1em tall — tighter than the glyphs that
+             * sit in it. The padding gives ascent and descent somewhere to go;
+             * the matching negative margin keeps the leading unchanged.
+             */
+            padding-block: 0.14em;
+            margin-block: -0.14em;
+        }
+
+        .scroll-line-mask > * {
+            display: block;
+            animation: line-reveal linear both;
+            animation-timeline: view();
+            animation-range:
+                entry calc(0% + var(--reveal-index, 0) * 6%)
+                entry calc(45% + var(--reveal-index, 0) * 6%);
+            will-change: transform;
+        }
+
+        /*
+         * Image reveal.
+         *
+         * A clip-path wipe uncovers the photograph while the image settles from a
+         * slight scale, so it is revealed rather than merely faded in. Clipping is
+         * applied to a wrapper the caller keeps `overflow-hidden`, so the work
+         * stays on a contained subtree instead of dirtying ancestor layout.
+         *
+         * Kept to 8%: `image-reveals` warns that aggressive zoom crops the
+         * composition the designer chose.
+         */
+        @keyframes image-uncover {
+            from {
+                clip-path: inset(0 0 100% 0);
+            }
+            to {
+                clip-path: inset(0 0 0 0);
+            }
+        }
+
+        @keyframes image-settle {
+            from {
+                transform: scale(1.08);
+            }
+            to {
+                transform: scale(1);
+            }
+        }
+
+        /*
+         * `--reveal-index` is inherited, so a caller can set it on an ancestor
+         * card and have the image join that card's cascade.
+         */
+        .scroll-image-reveal {
+            animation: image-uncover linear both;
+            animation-timeline: view();
+            animation-range:
+                entry calc(8% + var(--reveal-index, 0) * 5%)
+                entry calc(68% + var(--reveal-index, 0) * 5%);
+            will-change: clip-path;
+        }
+
+        /*
+         * `next/image` with `fill` renders the img directly, with no wrapper.
+         *
+         * `backwards`, not `both`: the fill must hold the pre-entry scale, then
+         * let go once the reveal is done. With `both` the animation keeps
+         * applying `scale(1)` indefinitely, and a running animation outranks the
+         * hover utility — so the image could never zoom again. Nothing else here
+         * competes for `transform`, which is why the clip-path wipe above can
+         * safely keep `both` and stay revealed.
+         */
+        .scroll-image-reveal > img {
+            animation: image-settle linear backwards;
+            animation-timeline: view();
+            animation-range:
+                entry calc(8% + var(--reveal-index, 0) * 5%)
+                entry calc(68% + var(--reveal-index, 0) * 5%);
+            will-change: transform;
+        }
+    }
+}
+
+/*
+ * Microinteraction motion.
+ *
+ * Deliberately outside the scroll block: hover/focus feedback must work on every
+ * browser, including those with no scroll-timeline support. Duration sits in
+ * MOTION.md's 100–180ms microinteraction band, so the interface never feels like
+ * it is waiting on itself.
+ */
+@media (prefers-reduced-motion: no-preference) {
+    @media (hover: hover) {
+        /* Cards and rows lift by a hair rather than scaling noticeably. */
+        .micro-lift {
+            transition: transform var(--motion-fast) var(--motion-ease-out);
+        }
+
+        .micro-lift:hover {
+            transform: translate3d(0, -2px, 0);
+        }
+
+        /* An arrow that travels on hover *and* keyboard focus. */
+        .micro-arrow {
+            transition: transform var(--motion-fast) var(--motion-ease-out);
+        }
+
+        :is(a, button):hover .micro-arrow,
+        :is(a, button):focus-visible .micro-arrow {
+            transform: translate3d(3px, 0, 0);
+        }
+    }
+
+    /*
+     * Controls that only exist on hover-capable pointers.
+     *
+     * A hover-revealed control is invisible on touch, where there is no hover to
+     * reveal it — leaving something on screen that looks absent but is still
+     * tappable. So the reveal is opt-in by pointer capability: devices with a
+     * hover-capable pointer get the affordance, devices without get it visible.
+     */
+    @media (hover: none) {
+        .micro-reveal-hover {
+            opacity: 1;
+        }
+    }
+}
+
+/*
+ * Workspace entrance.
+ *
+ * Deliberately time-based rather than scroll-based. The workspace scrolls inside
+ * its own `main` panel, and a dashboard frequently fits without scrolling at all
+ * — where a `view()` timeline would leave anything below the fold permanently at
+ * its hidden `from` state. Running on mount instead guarantees the end state is
+ * always reached.
+ *
+ * Small distance, short duration, no scale: MOTION.md asks the workspace to feel
+ * fast and low-ceremony rather than performed.
+ */
+@keyframes workspace-enter {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 6px, 0);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+.motion-enter {
+    animation: workspace-enter var(--motion-base) var(--motion-ease-out) both;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    /* A time-based cascade, so `animation-delay` is the correct mechanism here. */
+    .motion-enter-stagger > * {
+        animation: workspace-enter var(--motion-base) var(--motion-ease-out) both;
+        animation-delay: calc(var(--reveal-index, 0) * 40ms);
     }
 }
 

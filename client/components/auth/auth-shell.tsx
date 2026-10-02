@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, ReactNode } from "react";
+import React, { type ReactNode } from "react";
 import Link from "next/link";
 import Logo from "@/components/ui/logo";
 import { date, APP_NAME } from "@/utils/utils";
@@ -12,6 +12,11 @@ export const buildBackground = (src: string, opacity = 0.3) => `
   url(${src}) center center / cover no-repeat
 `;
 
+/*
+ * Entrance animation, opted into only when the visitor has not asked for
+ * reduced motion. The media query lives in CSS rather than in a JS matchMedia
+ * hook so there is no flash of moving content and no hydration mismatch.
+ */
 export const fadeUp = (delay = 0): React.CSSProperties => ({
   animation: `fadeUp 600ms cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms both`,
 });
@@ -22,9 +27,11 @@ export const AuthKeyframes = () => (
       from { opacity: 0; transform: translateY(14px); }
       to   { opacity: 1; transform: translateY(0); }
     }
-    @keyframes dropdownIn {
-      from { opacity: 0; transform: translateY(-6px) scale(0.96); }
-      to   { opacity: 1; transform: translateY(0) scale(1); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .auth-fade-up {
+        animation: none !important;
+      }
     }
   `}</style>
 );
@@ -68,135 +75,66 @@ export const MicrosoftIcon = () => (
 
 /* ---------- Social button ---------- */
 /**
- * Social sign-in is not implemented server-side yet, so these render disabled
- * with an explanatory tooltip rather than pretending to work.
+ * Renders as a link when `href` is supplied, since the OAuth handshake is a
+ * full-page navigation to the provider. Without `href` it stays a button so
+ * providers we have not wired server side remain visibly inert rather than
+ * looking functional.
  */
 export const SocialButton = ({
   label,
+  href,
   disabled = false,
   children,
 }: {
   label: string;
+  href?: string;
   disabled?: boolean;
   children: ReactNode;
-}) => (
-  <button
-    type="button"
-    aria-label={label}
-    disabled={disabled}
-    title={disabled ? "Coming soon" : undefined}
-    className={`
-      flex items-center justify-center h-11 w-full
-      bg-white border border-gray-200 rounded-2xl
-      transition-all duration-200 ease-out
+}) => {
+  const className = `
+      flex h-11 w-full items-center justify-center
+      rounded-sm border border-line bg-surface
+      transition-colors duration-150 ease-out
       ${
         disabled
           ? "cursor-not-allowed opacity-50 grayscale"
-          : "cursor-pointer hover:-translate-y-0.5 hover:border-gray-300 hover:bg-gray-50 hover:shadow-md hover:shadow-black/5 active:translate-y-0 active:shadow-sm"
+          : "cursor-pointer hover:border-line-strong hover:bg-surface-subtle"
       }
-    `}
-  >
-    {children}
-  </button>
-);
+    `;
 
-/* ---------- Language select ---------- */
-const languages = [
-  { code: "en", label: "English" },
-  { code: "fr", label: "French" },
-] as const;
-
-type Language = (typeof languages)[number];
-
-export const LanguageSelect = () => {
-  const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState<Language>(languages[0]);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node))
-        setOpen(false);
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  return (
-    <div ref={ref} className="relative">
+  if (disabled || !href) {
+    return (
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors duration-200 cursor-pointer"
+        aria-label={label}
+        disabled={disabled}
+        title={disabled ? "Coming soon" : undefined}
+        className={className}
       >
-        <span>{selected.label}</span>
-        <svg
-          className={`w-3.5 h-3.5 transition-transform duration-200 ease-out ${
-            open ? "rotate-180" : ""
-          }`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
+        {children}
       </button>
+    );
+  }
 
-      {open && (
-        <ul
-          role="listbox"
-          style={{
-            animation: "dropdownIn 180ms cubic-bezier(0.22, 1, 0.36, 1) both",
-          }}
-          className="absolute right-0 mt-1.5 w-32 bg-white border border-gray-200 rounded-lg shadow-lg shadow-black/5 overflow-hidden z-20 py-1 origin-top-right"
-        >
-          {languages.map((lang) => (
-            <li key={lang.code}>
-              <button
-                type="button"
-                role="option"
-                aria-selected={selected.code === lang.code}
-                onClick={() => {
-                  setSelected(lang);
-                  setOpen(false);
-                }}
-                className={`w-full flex items-center px-3 py-2 text-sm text-left transition-colors duration-150 cursor-pointer ${
-                  selected.code === lang.code
-                    ? "bg-gray-100 text-gray-900 font-medium"
-                    : "text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                <span>{lang.label}</span>
-                {selected.code === lang.code && (
-                  <svg
-                    className="w-3.5 h-3.5 ml-auto text-gray-900"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+  return (
+    <a href={href} aria-label={label} title={label} className={className}>
+      {children}
+    </a>
   );
 };
+
+/* ---------- Language ---------- */
+/**
+ * Renove ships in English only. This used to be a dropdown offering French that
+ * silently did nothing — a control that looks live but is not. It is now plain,
+ * non-interactive text: no affordance, nothing to break, no false promise.
+ *
+ * If a second language is ever approved, this becomes a real menu with
+ * keyboard support and an `aria-label` of "Language".
+ */
+export const LanguageLabel = () => (
+  <span className="select-none px-1 text-[13px] text-ink-subtle">English</span>
+);
 
 /* ---------- Checkbox ---------- */
 interface CheckboxProps {
@@ -220,7 +158,7 @@ export const Checkbox = ({
 }: CheckboxProps) => (
   <label
     htmlFor={id}
-    className="flex items-start gap-2 text-[12px] text-gray-600 cursor-pointer select-none leading-relaxed"
+    className="flex cursor-pointer items-start gap-2 text-[12px] leading-relaxed text-ink-muted select-none has-disabled:cursor-not-allowed has-disabled:opacity-60"
   >
     <input
       id={id}
@@ -234,18 +172,16 @@ export const Checkbox = ({
     />
     <span
       className="
-        mt-[1px] shrink-0
-        w-4 h-4 rounded-[5px] bg-white
-        border border-gray-300
-        flex items-center justify-center
-        transition-all duration-200
-        peer-checked:bg-gray-900 peer-checked:border-gray-900
+        mt-[1px] flex h-4 w-4 shrink-0 items-center justify-center
+        rounded-xs border border-line-strong bg-surface
+        transition-colors duration-150
+        peer-checked:border-ink peer-checked:bg-ink
         peer-checked:[&>svg]:opacity-100
-        peer-focus-visible:ring-2 peer-focus-visible:ring-gray-900/20
+        peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink
       "
     >
       <svg
-        className="w-2.5 h-2.5 text-white opacity-0 transition-opacity duration-150"
+        className="size-2.5 text-ink-inverse opacity-0 transition-opacity duration-150"
         fill="none"
         stroke="currentColor"
         strokeWidth="3"
@@ -261,6 +197,12 @@ export const Checkbox = ({
 /* ---------- Shell ---------- */
 interface AuthShellProps {
   heroImage: string;
+  /**
+   * Marketing line shown on the desktop hero panel. It is deliberately *not* an
+   * `h1`: every auth screen supplies its own heading for the form, and two `h1`
+   * landmarks on one page breaks the document outline. `aria-hidden` keeps it
+   * out of the accessibility tree so screen readers hear the form's heading.
+   */
   heroTitle: string;
   heroSubtitle: string;
   promoImage?: string;
@@ -278,7 +220,11 @@ export const AuthShell = ({
   const promoBackground = buildBackground(promoImage ?? heroImage);
 
   return (
-    <main className="overflow-hidden w-full h-screen bg-white p-3 sm:p-4 lg:p-4.75">
+    <main
+      id="main"
+      tabIndex={-1}
+      className="w-full min-h-dvh overflow-hidden bg-surface p-3 sm:p-4 lg:h-dvh lg:p-4.75"
+    >
       <AuthKeyframes />
 
       <div
@@ -287,6 +233,7 @@ export const AuthShell = ({
       >
         {/* ---------- Hero (desktop only) ---------- */}
         <div
+          aria-hidden="true"
           className="
             hidden lg:flex flex-col items-start justify-between gap-4
             max-w-[500px]
@@ -296,46 +243,45 @@ export const AuthShell = ({
             lg:h-[calc(100%-8rem)] xl:h-[calc(100%-11.25rem)]
           "
         >
-          <div style={fadeUp(100)}>
+          <div className="auth-fade-up" style={fadeUp(100)}>
             <Logo variant="light" />
           </div>
 
           <div className="flex flex-col gap-1.25">
-            <h1
+            <p
+              className="auth-fade-up font-medium text-[42px] leading-tight text-white xl:text-[48px]"
               style={fadeUp(200)}
-              className="font-medium text-[42px] xl:text-[48px] text-white leading-tight"
             >
               {heroTitle}
-            </h1>
+            </p>
             <p
+              className="auth-fade-up text-[16px] text-ink-inverse-muted xl:text-[18px]"
               style={fadeUp(300)}
-              className="text-[16px] xl:text-[18px] text-white/90"
             >
               {heroSubtitle}
             </p>
           </div>
 
-          <p style={fadeUp(400)} className="text-[10px] text-white/70">
+          <p
+            className="auth-fade-up text-[10px] text-ink-inverse-muted"
+            style={fadeUp(400)}
+          >
             &copy; {APP_NAME} {date}. All rights reserved.
           </p>
         </div>
 
         {/* ---------- Card ---------- */}
         <div
-          style={fadeUp(150)}
           className="
-            bg-white flex flex-col
-            w-full max-w-[540px] mx-auto
-            lg:mx-0 lg:mr-5.5 lg:my-5.5 lg:max-w-[500px]
-            flex-1 lg:flex-none
-            rounded-3xl lg:rounded-4xl
-            px-5 py-6 sm:px-7 sm:py-7 lg:px-8 lg:pt-6 lg:pb-8
-            shadow-lg shadow-black/5
-            overflow-y-auto overscroll-contain
+            auth-fade-up flex w-full max-w-[540px] flex-1 flex-col
+            overflow-y-auto overscroll-contain rounded-3xl bg-white
+            px-5 py-6 sm:px-7 sm:py-7 lg:mx-0 lg:my-5.5 lg:mr-5.5 lg:max-w-[500px]
+            lg:flex-none lg:rounded-4xl lg:px-8 lg:pt-6 lg:pb-8
             [&::-webkit-scrollbar]:hidden
             [-ms-overflow-style:none]
             [scrollbar-width:none]
           "
+          style={fadeUp(150)}
         >
           {/* Top bar — mobile logo (left) + language (right) */}
           <div className="flex items-center shrink-0">
@@ -343,7 +289,7 @@ export const AuthShell = ({
               <Logo variant="dark" />
             </div>
             <div className="ml-auto">
-              <LanguageSelect />
+              <LanguageLabel />
             </div>
           </div>
 
@@ -354,19 +300,17 @@ export const AuthShell = ({
             {promoImage !== undefined && (
               <div
                 className="
-                  group flex flex-col justify-between w-full
-                  h-36 sm:h-40 lg:h-42.5
-                  rounded-[20px] p-5 sm:p-6 overflow-hidden
-                  transition-all duration-300 ease-out
-                  hover:-translate-y-1 hover:shadow-xl hover:shadow-black/20
+                  group flex w-full flex-col justify-between overflow-hidden
+                  h-36 rounded-md p-5 sm:h-40 sm:p-6 lg:h-42.5
+                  transition-colors duration-200 ease-out
                 "
                 style={{ background: promoBackground }}
               >
                 <div className="flex flex-col gap-1">
-                  <p className="text-[15px] sm:text-[16px] font-bold text-white">
+                  <p className="text-[15px] font-medium text-ink-inverse sm:text-[16px]">
                     New to {APP_NAME}?
                   </p>
-                  <p className="text-[12px] sm:text-[13px] text-white/80">
+                  <p className="text-[12px] text-ink-inverse-muted sm:text-[13px]">
                     See plans for solo architects and growing studios.
                   </p>
                 </div>
@@ -375,35 +319,32 @@ export const AuthShell = ({
                   <Link
                     href="/pricing"
                     className="
-                      inline-flex items-center gap-1.5
-                      px-4 h-9
-                      rounded-full
-                      border border-white/60
-                      bg-white/0 hover:bg-white/15
-                      backdrop-blur-sm
-                      text-[13px] font-medium text-white
-                      transition-all duration-200 ease-out
-                      hover:border-white hover:shadow-md hover:shadow-black/20
-                      active:scale-[0.97]
+                      inline-flex h-9 items-center gap-1.5 rounded-xs
+                      border border-line-inverse px-4
+                      text-[13px] font-medium text-ink-inverse
+                      transition-colors duration-150 ease-out
+                      hover:border-ink-inverse hover:bg-white/10
+                      focus-visible:outline-2 focus-visible:outline-offset-2
+                      focus-visible:outline-ink-inverse
                     "
                   >
                     See pricing
-                    <ChevronRight className="w-4 h-4 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
+                    <ChevronRight className="size-4 transition-transform duration-150 ease-out group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0" />
                   </Link>
                 </div>
               </div>
             )}
 
-            <div className="flex justify-center sm:justify-end gap-6 sm:gap-10 text-xs text-gray-400">
+            <div className="flex justify-center gap-6 text-xs text-ink-subtle sm:justify-end sm:gap-10">
               <Link
                 href="/legal/terms"
-                className="hover:text-gray-600 hover:underline underline-offset-2 transition-colors duration-200"
+                className="underline-offset-2 transition-colors duration-150 hover:text-ink hover:underline"
               >
                 Terms of Service
               </Link>
               <Link
                 href="/legal/privacy"
-                className="hover:text-gray-600 hover:underline underline-offset-2 transition-colors duration-200"
+                className="underline-offset-2 transition-colors duration-150 hover:text-ink hover:underline"
               >
                 Privacy Policy
               </Link>

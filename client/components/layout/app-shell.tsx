@@ -1,29 +1,15 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import Logo from "@/components/ui/logo";
-
-/**
- * Workspace navigation, derived from the domain model in section 9 of
- * app-details.md. Routes that do not exist yet are marked `ready: false` and
- * render as plain text so the shell never links to a 404.
- *
- * TODO(aaron): all visual design. Replace this list's presentation freely —
- * the group names and the ordering are the part that carries meaning.
- */
-interface NavItem {
-  label: string;
-  href: string;
-  ready: boolean;
-}
-
-interface NavGroup {
-  label: string;
-  items: NavItem[];
-}
+import WorkspaceNav, {
+  type NavGroup,
+} from "@/components/workspace/workspace-nav";
+import WorkspaceMobileNav from "@/components/workspace/workspace-mobile-nav";
+import WorkspaceTopbar from "@/components/workspace/workspace-topbar";
 
 const NAV_GROUPS: NavGroup[] = [
   {
@@ -31,36 +17,24 @@ const NAV_GROUPS: NavGroup[] = [
     items: [{ label: "Dashboard", href: "/dashboard", ready: true }],
   },
   {
-    label: "Pipeline",
+    label: "Work",
     items: [
-      { label: "Leads", href: "/leads", ready: false },
-      { label: "Clients", href: "/clients", ready: false },
-      { label: "Proposals", href: "/proposals", ready: false },
-      { label: "Contracts", href: "/contracts", ready: false },
+      { label: "Projects", href: "/projects", ready: true },
+      { label: "Deliverables", href: "/deliverables", ready: true },
+      { label: "Clients & Pipeline", href: "/clients", ready: true },
+      { label: "Leads", href: "/leads", ready: true },
     ],
   },
   {
-    label: "Delivery",
+    label: "Operations",
     items: [
-      { label: "Projects", href: "/projects", ready: false },
-      { label: "Phases", href: "/phases", ready: false },
-      { label: "Tasks", href: "/tasks", ready: false },
-      { label: "Deliverables", href: "/deliverables", ready: false },
+      { label: "Tasks", href: "/tasks", ready: true },
       { label: "Approvals", href: "/approvals", ready: false },
-      { label: "Files", href: "/files", ready: false },
+      { label: "Documents", href: "/documents", ready: false },
     ],
   },
   {
-    label: "Cost",
-    items: [
-      { label: "Procurement", href: "/procurement", ready: false },
-      { label: "Vendors", href: "/vendors", ready: false },
-      { label: "Products", href: "/products", ready: false },
-      { label: "Site", href: "/site", ready: false },
-    ],
-  },
-  {
-    label: "Money",
+    label: "Finance",
     items: [
       { label: "Invoices", href: "/invoices", ready: false },
       { label: "Payments", href: "/payments", ready: false },
@@ -70,80 +44,104 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Practice",
     items: [
-      { label: "Members", href: "/settings/members", ready: false },
-      { label: "Notifications", href: "/notifications", ready: false },
-      { label: "Audit log", href: "/audit", ready: false },
+      { label: "Procurement", href: "/procurement", ready: false },
+      { label: "Team", href: "/team", ready: true },
+      { label: "Settings", href: "/settings", ready: true },
     ],
   },
 ];
-
-function isActive(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
 
 interface AppShellProps {
   children: ReactNode;
 }
 
+const SIDEBAR_COLLAPSED_KEY = "renove-sidebar-collapsed";
+
+/**
+ * Read the stored preference during the initial render rather than in an effect:
+ * `useState`'s lazy initialiser runs once, on the server too, so the very first
+ * paint already has the correct width and there is no flash of an expanded rail.
+ */
+const readStoredCollapsed = () => {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+};
+
 const AppShell = ({ children }: AppShellProps) => {
-  const pathname = usePathname();
+  const [isNavOpen, setIsNavOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(readStoredCollapsed);
+
+  useEffect(() => {
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(isCollapsed));
+  }, [isCollapsed]);
+
+  const closeNav = useCallback(() => setIsNavOpen(false), []);
+  const toggleCollapse = useCallback(
+    () => setIsCollapsed((prev) => !prev),
+    [],
+  );
 
   return (
-    <div className="flex min-h-full">
-      {/* TODO(aaron): sidebar design — width, collapse, mobile drawer */}
-      <aside className="hidden w-64 shrink-0 border-r border-black/5 lg:block">
-        <div className="px-6 py-6">
-          <Link href="/" aria-label="Renove home">
+    <div className="flex h-dvh overflow-hidden bg-background">
+      <aside
+        className={[
+          "group hidden shrink-0 flex-col border-r border-line bg-surface lg:flex transition-[width] duration-200 ease-out relative z-10",
+          isCollapsed ? "w-16" : "w-64",
+          "overflow-visible",
+        ].join(" ")}
+      >
+        <div
+          className={[
+            "px-5 py-5 flex items-center",
+            isCollapsed ? "justify-center" : "justify-between",
+          ].join(" ")}
+        >
+          <Link
+            href="/"
+            aria-label="Renove home"
+            className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink"
+          >
             <Logo variant="dark" />
           </Link>
         </div>
 
-        <nav className="flex flex-col gap-6 px-4 pb-8">
-          {NAV_GROUPS.map((group) => (
-            <div key={group.label}>
-              <p className="px-2 text-[11px] font-bold tracking-[0.15em] text-black/40 uppercase">
-                {group.label}
-              </p>
+        <button
+          type="button"
+          onClick={toggleCollapse}
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="absolute -right-3 top-6 flex size-6 items-center justify-center rounded-full border border-line bg-surface shadow-sm text-ink-subtle transition-colors hover:bg-surface-subtle hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        >
+          {isCollapsed ? <ChevronRight className="size-3.5" /> : <ChevronLeft className="size-3.5" />}
+        </button>
 
-              <ul className="mt-2 flex flex-col gap-0.5">
-                {group.items.map((item) => {
-                  const active = isActive(pathname, item.href);
-
-                  if (!item.ready) {
-                    return (
-                      <li key={item.href} title="Not built yet">
-                        <span className="block rounded-lg px-2 py-1.5 text-[14px] text-black/30">
-                          {item.label}
-                        </span>
-                      </li>
-                    );
-                  }
-
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        aria-current={active ? "page" : undefined}
-                        className={`block rounded-lg px-2 py-1.5 text-[14px] ${
-                          active
-                            ? "bg-black/5 text-black"
-                            : "text-black/60 hover:bg-black/5 hover:text-black"
-                        }`}
-                      >
-                        {item.label}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
-        </nav>
+        <div
+          className={[
+            "pb-6 flex-1 overflow-y-auto custom-scrollbar",
+            isCollapsed ? "px-2" : "px-4",
+          ].join(" ")}
+        >
+          <WorkspaceNav groups={NAV_GROUPS} collapsed={isCollapsed} />
+        </div>
       </aside>
 
+      <WorkspaceMobileNav
+        groups={NAV_GROUPS}
+        isOpen={isNavOpen}
+        onClose={closeNav}
+      />
+
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* TODO(aaron): topbar — practice switcher, search, notifications */}
-        <div className="flex-1">{children}</div>
+        <WorkspaceTopbar onOpenNav={() => setIsNavOpen(true)} isNavOpen={isNavOpen} />
+        <main
+          id="main"
+          className="min-h-0 flex-1 overflow-y-auto"
+          tabIndex={-1}
+        >
+          {children}
+        </main>
       </div>
     </div>
   );

@@ -24,6 +24,7 @@
     "strict": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
-    "useUnknownInCatchVariables": true
+    "useUnknownInCatchVariables": true,
+    "typeRoots": ["node_modules/@types", "src/types"]
   }
 }

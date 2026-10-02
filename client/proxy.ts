@@ -21,8 +21,25 @@ import { NextResponse, type NextRequest } from "next/server";
  * the visitor is returned to `next`.
  */
 
-/** Route prefixes that require a session. Route groups are not in the URL. */
-const PROTECTED_PREFIXES = ["/dashboard"];
+/**
+ * Route prefixes that require a session. Route groups are not in the URL, so
+ * this is one entry per page directory under `app/(workspace)`.
+ *
+ * These must stay in step with that directory: the workspace layout already
+ * gates every route through `ProtectedRoute`, so a missing entry is not a
+ * security hole, only a client-side redirect flash instead of a server-side
+ * one.
+ */
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/projects",
+  "/tasks",
+  "/deliverables",
+  "/clients",
+  "/leads",
+  "/team",
+  "/settings",
+];
 
 /**
  * Signed-in visitors skip the pitch and go straight to their workspace, the way

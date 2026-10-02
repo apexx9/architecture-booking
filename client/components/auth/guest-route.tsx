@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { sanitizeNextPath } from "@/lib/auth/redirect";
 
+import AuthPending from "@/components/auth/auth-pending";
+
 interface GuestRouteProps {
   children: ReactNode;
 }
@@ -28,12 +30,17 @@ export function GuestRoute({ children }: GuestRouteProps) {
     }
   }, [isLoading, isAuthenticated, router]);
 
+  /*
+   * Both branches render the same pending state: one is "we don't know yet",
+   * the other is "we know, and a redirect is in flight". Rendering `null` in
+   * either case produced a blank flash.
+   */
   if (isLoading) {
-    return null;
+    return <AuthPending />;
   }
 
   if (isAuthenticated) {
-    return null;
+    return <AuthPending />;
   }
 
   return children;

@@ -8,6 +8,13 @@ import { AppConfigModule } from '@/config/app-config.module';
 import { DatabaseModule } from '@/db/database.module';
 import { HealthModule } from '@/health/health.module';
 import { TenancyModule } from '@/tenancy/tenancy.module';
+import { LeadsModule } from '@/leads/leads.module';
+import { ClientsModule } from '@/clients/clients.module';
+import { ProjectsModule } from '@/projects/projects.module';
+import { ProjectPhasesModule } from '@/project-phases/project-phases.module';
+import { TasksModule } from '@/tasks/tasks.module';
+import { DeliverablesModule } from '@/deliverables/deliverables.module';
+import { FilesModule } from '@/files/files.module';
 
 @Module({
   imports: [
@@ -26,6 +33,13 @@ import { TenancyModule } from '@/tenancy/tenancy.module';
     AuthModule,
     HealthModule,
     TenancyModule,
+    LeadsModule,
+    ClientsModule,
+    ProjectsModule,
+    ProjectPhasesModule,
+    TasksModule,
+    DeliverablesModule,
+    FilesModule,
   ],
 
   providers: [

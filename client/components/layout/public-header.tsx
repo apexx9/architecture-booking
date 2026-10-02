@@ -6,14 +6,9 @@ import { usePathname } from "next/navigation";
 
 import Logo from "@/components/ui/logo";
 import { EngageCta } from "@/components/auth/engage-cta";
+import { PUBLIC_NAV_LINKS } from "@/lib/navigation/public";
 
-const NAV_LINKS = [
-  { name: "Overview", href: "/" },
-  { name: "Pricing", href: "/pricing" },
-  { name: "Templates", href: "/templates" },
-  { name: "Resources", href: "/blog" },
-  { name: "About", href: "/about" },
-];
+const NAV_LINKS = PUBLIC_NAV_LINKS;
 
 const PANEL_ID = "marketing-mobile-nav";
 
@@ -235,7 +230,14 @@ const PublicHeader = () => {
           </ul>
         </nav>
 
-        <div className="flex shrink-0 items-center gap-2">
+        {/*
+          `h-11` matches the logo link's 44px touch box. Without it the group
+          collapses to the 40px CTA on desktop (the 44px menu button is
+          `lg:hidden`) and the two sides of the bar sit 4px uneven. The CTA
+          stays 40px and is centred inside this box, so only the alignment
+          changes.
+        */}
+        <div className="flex h-11 shrink-0 items-center gap-2">
           {/* Mobile Menu Toggle Button with max z-index and touch handlers */}
           <button
             ref={toggleRef}
