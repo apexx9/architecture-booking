@@ -15,7 +15,41 @@ async function bootstrap() {
   const appConfig = app.get(AppConfigService);
 
   app.enableCors({
-    origin: appConfig.frontendUrl,
+    origin: (requestOrigin: string | undefined, callback: (err: Error | null, allow?: boolean | string) => void) => {
+      if (!requestOrigin) {
+        return callback(null, true);
+      }
+
+      const allowedOrigins = appConfig.frontendUrl
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean);
+
+      if (allowedOrigins.includes(requestOrigin)) {
+        return callback(null, true);
+      }
+
+      // Allow Vercel preview deployments matching the app pattern
+      if (
+        (requestOrigin.includes('apexx9-architecture-booking') ||
+          requestOrigin.includes('architecture-booking')) &&
+        requestOrigin.endsWith('.vercel.app')
+      ) {
+        return callback(null, true);
+      }
+
+      // Try to match any vercel.app origin with architecture-booking in name
+      try {
+        const parsed = new URL(requestOrigin);
+        if (parsed.hostname.endsWith('vercel.app') && parsed.hostname.includes('architecture-booking')) {
+          return callback(null, true);
+        }
+      } catch {
+        // ignore
+      }
+
+      return callback(null, allowedOrigins[0] || appConfig.frontendUrl);
+    },
     credentials: true,
   });
 

@@ -41,10 +41,11 @@ export class AppConfigService {
      * fails silently: every credentialed request is blocked and Set-Cookie is
      * discarded, so auth looks broken with no error in either console.
      */
-    return this.configService.getOrThrow<string>(
+    const url = this.configService.getOrThrow<string>(
       'FRONTEND_URL',
       'http://localhost:3000',
     );
+    return url;
   }
 
   get databaseUrl(): string {
