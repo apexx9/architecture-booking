@@ -24,6 +24,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
     initialized.current = true;
 
     async function bootstrap() {
+      if (typeof document !== "undefined") {
+        const cookies = document.cookie.split("; ");
+        const hasAccessToken = cookies.some((cookie) =>
+          cookie.startsWith("access_token="),
+        );
+        const hasRefreshToken = cookies.some((cookie) =>
+          cookie.startsWith("refresh_token="),
+        );
+
+        if (!hasAccessToken && !hasRefreshToken) {
+          setUnauthenticated();
+          return;
+        }
+      }
+
       setLoading();
 
       try {
