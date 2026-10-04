@@ -1,4 +1,3 @@
-
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
@@ -28,13 +27,19 @@ async function bootstrap() {
         return callback(null, true);
       }
 
-      // Explicitly configured frontend URLs.
+      // Explicitly configured frontend URLs. Normalize both sides so a trailing
+      // slash in FRONTEND_URL does not reject a valid origin and silently drop
+      // the auth cookies the browser needs to persist the session.
+      const normalizeOrigin = (origin: string) =>
+        origin.trim().replace(/\/+$/, '');
+
       const allowedOrigins = appConfig.frontendUrl
         .split(',')
-        .map((origin) => origin.trim())
+        .map((origin) => normalizeOrigin(origin))
         .filter(Boolean);
 
-      const isAllowed = allowedOrigins.includes(requestOrigin);
+      const normalizedRequestOrigin = normalizeOrigin(requestOrigin);
+      const isAllowed = allowedOrigins.includes(normalizedRequestOrigin);
 
       // Allow Vercel preview deployments for this project.
       const isVercelPreview = (() => {
@@ -59,23 +64,27 @@ async function bootstrap() {
        * call and discards Set-Cookie, which reads as a broken backend rather than
        * a CORS mismatch. Gated on isProduction so it cannot widen a real deploy.
        */
-      const isLocalDevOrigin = !appConfig.isProduction && (() => {
-        try {
-          const { hostname } = new URL(requestOrigin);
+      const isLocalDevOrigin =
+        !appConfig.isProduction &&
+        (() => {
+          try {
+            const { hostname } = new URL(requestOrigin);
 
-          if (hostname === 'localhost' || hostname === '[::1]') {
-            return true;
+            if (hostname === 'localhost' || hostname === '[::1]') {
+              return true;
+            }
+
+            if (hostname === '127.0.0.1' || hostname === '::1') {
+              return true;
+            }
+
+            return /^10\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\./.test(
+              hostname,
+            );
+          } catch {
+            return false;
           }
-
-          if (hostname === '127.0.0.1' || hostname === '::1') {
-            return true;
-          }
-
-          return /^10\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\./.test(hostname);
-        } catch {
-          return false;
-        }
-      })();
+        })();
 
       if (isAllowed || isVercelPreview || isLocalDevOrigin) {
         return callback(null, true);
@@ -95,11 +104,7 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'X-CSRF-Token',
-    ],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
   });
 
   app.useGlobalPipes(
