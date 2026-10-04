@@ -23,11 +23,6 @@ export function GuestRoute({ children }: GuestRouteProps) {
   const router = useRouter();
 
   const { isLoading, isAuthenticated } = useAuth();
-  console.log("[GuestRoute]", {
-    isLoading,
-    isAuthenticated,
-    pathname: window.location.pathname,
-  });
 
   const redirecting = useRef(false);
 
