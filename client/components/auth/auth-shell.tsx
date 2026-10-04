@@ -301,7 +301,7 @@ export const AuthShell = ({
               <div
                 className="
                   group flex w-full flex-col justify-between overflow-hidden
-                  h-36 rounded-md p-5 sm:h-40 sm:p-6 lg:h-42.5
+                  h-36 rounded-sm p-5 sm:h-40 sm:p-6 lg:h-42.5
                   transition-colors duration-200 ease-out
                 "
                 style={{ background: promoBackground }}

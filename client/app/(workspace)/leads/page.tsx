@@ -235,7 +235,7 @@ const LeadsPage = () => {
                         onChange={(event) =>
                           updateStatus(lead, event.target.value as Lead["status"])
                         }
-                        className="h-8 rounded-sm border border-line bg-surface px-2 text-[12px] text-ink disabled:opacity-50"
+                        className="h-8 rounded-sm border border-line bg-surface px-2 pr-8 text-[12px] text-ink disabled:opacity-50 appearance-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink bg-[url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2214%22 height=%2214%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236b6b6b%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpolyline points=%226 9 12 15 18 9%22%3E%3C/polyline%3E%3C/svg%3E')] bg-[right_6px_center] bg-no-repeat"
                       >
                         {LEAD_STATUS_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
@@ -274,7 +274,7 @@ const LeadsPage = () => {
           )}
         </CardBody>
       </Card>
-      </div>
+</div>
       <Dialog open={open} onClose={() => setOpen(false)} label="New Lead" title="New Lead">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

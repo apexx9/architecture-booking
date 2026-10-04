@@ -16,7 +16,7 @@ const AuthPending = () => (
     aria-busy="true"
     className="flex min-h-dvh w-full flex-col items-center justify-center bg-background px-6"
   >
-    <div className="w-full max-w-xs rounded-md border border-line bg-surface p-5 shadow-[0_10px_30px_rgba(25,25,25,0.02)]">
+    <div className="w-full max-w-xs rounded-sm border border-line bg-surface p-5 shadow-[0_10px_30px_rgba(25,25,25,0.02)]">
       <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-subtle">
         Secure access
       </p>

@@ -101,8 +101,8 @@ export function Popover({
           role="menu"
           aria-label={label}
           className={[
-            "absolute top-full z-50 mt-1.5 min-w-56 rounded-md border border-line",
-            "bg-surface py-1",
+            "absolute top-full z-50 mt-1.5 min-w-56 rounded-sm border border-line",
+            "bg-surface py-0.5 shadow-[0_12px_32px_-16px_rgba(25,25,25,0.35)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-white",
             align === "end" ? "right-0" : "left-0",
           ].join(" ")}
         >

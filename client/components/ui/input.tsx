@@ -80,7 +80,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           className={`
             flex w-full items-center gap-2 rounded-sm border bg-surface
             px-3.5 py-2.5
-            transition-colors duration-150 ease-out
+            transition-colors duration-150 ease-out relative has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ink has-[:focus-visible]:ring-offset-0 has-[:focus-visible]:outline-none
             ${
               disabled
                 ? "cursor-not-allowed border-line bg-surface-sunken opacity-60"
@@ -105,9 +105,11 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             aria-invalid={error ? true : undefined}
             aria-describedby={describedBy}
             className={`
-              flex-1 bg-transparent text-sm text-ink outline-none
+              flex-1 bg-transparent text-sm text-ink outline-none w-full
               placeholder:text-ink-subtle
               disabled:cursor-not-allowed
+              [appearance:textfield]
+              [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
               ${className}
             `}
             {...props}

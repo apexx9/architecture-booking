@@ -19,7 +19,7 @@ interface UserMenuProps {
 }
 
 const menuItemClass =
-  "flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left text-[13px] text-ink-muted transition-colors duration-150 hover:bg-surface-subtle hover:text-ink focus-visible:bg-surface-subtle focus-visible:text-ink focus-visible:outline-none";
+  "flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left text-[13px] text-ink-muted transition-colors duration-150 relative hover:bg-surface-subtle hover:text-ink focus-visible:bg-surface-subtle focus-visible:text-ink focus-visible:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
 
 /**
  * Account menu: identity, practice switching, and the session controls.
@@ -82,7 +82,7 @@ const UserMenu = ({
     >
       {(close) => (
         <>
-          <div className="border-b border-line-muted px-3 pt-2 pb-3">
+          <div           className="border-b border-line-muted px-3 pt-2 pb-3">
             <p className="truncate text-[13px] font-medium text-ink">
               {accountLabel}
             </p>
@@ -91,14 +91,14 @@ const UserMenu = ({
                 {user.email}
               </p>
             ) : null}
-            <p className="mt-2 text-[11px] tracking-[0.1em] text-ink-subtle uppercase">
+            <p className="mt-2 text-[11px] tracking-[0.08em] text-ink-subtle uppercase">
               Signed in to {APP_NAME}
             </p>
           </div>
 
           {tenantCount > 0 ? (
             <div className="border-b border-line-muted py-1">
-              <p className="px-3 pt-2 pb-1.5 text-[11px] tracking-[0.1em] text-ink-subtle uppercase">
+              <p className="px-3 pt-2 pb-1.5 text-[11px] tracking-[0.08em] text-ink-subtle uppercase">
                 Practice
               </p>
 
@@ -123,6 +123,12 @@ const UserMenu = ({
                      * Active practice is marked by the check glyph and the
                      * text weight, not by colour alone.
                      */}
+                    {isActive ? (
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-y-0 left-0 w-0.5 bg-ink"
+                      />
+                    ) : null}
                     <Check
                       aria-hidden="true"
                       className={`size-3.5 shrink-0 ${isActive ? "text-ink" : "text-transparent"}`}
@@ -139,7 +145,7 @@ const UserMenu = ({
             </div>
           ) : tenantName ? (
             <div className="border-b border-line-muted px-3 py-2.5">
-              <p className="text-[11px] tracking-[0.1em] text-ink-subtle uppercase">
+              <p className="text-[11px] tracking-[0.08em] text-ink-subtle uppercase">
                 Practice
               </p>
               <p className="mt-0.5 truncate text-[13px] text-ink">

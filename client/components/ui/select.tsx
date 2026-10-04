@@ -478,11 +478,7 @@ const Select = ({
           <div
             ref={panelRef}
             className={[
-              "absolute z-50 w-full overflow-hidden rounded-md border border-line bg-surface",
-              // A single soft shadow, plus a hairline top highlight so the panel
-              // separates from the field without a heavy drop shadow.
-              "shadow-[0_12px_32px_-16px_rgba(25,25,25,0.35)]",
-              "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-white",
+              "absolute z-50 w-full overflow-hidden rounded-sm border border-line bg-surface shadow-[0_12px_32px_-16px_rgba(25,25,25,0.35)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-white",
               shouldFlip ? "bottom-full mb-1.5" : "top-full mt-1.5",
             ].join(" ")}
           >
@@ -519,13 +515,13 @@ const Select = ({
                       onClick={() => commit(index)}
                       className={[
                         "relative flex items-start gap-2.5 px-3 py-2",
-                        "text-[13px]",
+                        "text-[13px] transition-colors duration-150",
                         option.disabled
                           ? "cursor-not-allowed opacity-40"
                           : "cursor-pointer",
                         isActive && !option.disabled
                           ? "bg-surface-subtle text-ink"
-                          : "text-ink-muted",
+                          : "text-ink-muted hover:bg-surface-subtle hover:text-ink",
                       ].join(" ")}
                     >
                       {/*

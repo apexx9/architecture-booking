@@ -381,7 +381,7 @@ const TasksPage = () => {
                     status: event.target.value as TaskStatus,
                   })
                 }
-                className="h-10 w-full rounded-sm border border-line bg-surface px-3 text-sm text-ink"
+                className="h-10 w-full rounded-sm border border-line bg-surface px-3 pr-9 text-sm text-ink appearance-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink bg-[url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236b6b6b%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpolyline points=%226 9 12 15 18 9%22%3E%3C/polyline%3E%3C/svg%3E')] bg-[right_8px_center] bg-no-repeat"
               >
                 {TASK_STATUSES.map((status) => (
                   <option key={status} value={status}>
@@ -407,7 +407,7 @@ const TasksPage = () => {
                     priority: event.target.value as TaskPriority,
                   })
                 }
-                className="h-10 w-full rounded-sm border border-line bg-surface px-3 text-sm text-ink"
+                className="h-10 w-full rounded-sm border border-line bg-surface px-3 pr-9 text-sm text-ink appearance-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink bg-[url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236b6b6b%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpolyline points=%226 9 12 15 18 9%22%3E%3C/polyline%3E%3C/svg%3E')] bg-[right_8px_center] bg-no-repeat"
               >
                 {TASK_PRIORITIES.map((priority) => (
                   <option key={priority} value={priority}>
