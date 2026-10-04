@@ -1,7 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect } from "react";
-
+import { type ReactNode, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/hooks/use-auth";
@@ -14,27 +13,42 @@ interface GuestRouteProps {
 }
 
 /**
- * Keeps signed-in users out of the auth screens, returning them to the page
- * that sent them there (`?next=`), or the dashboard by default.
+ * Keeps signed-in users out of authentication screens.
+ *
+ * Authentication is established by the global AuthProvider. Once the provider
+ * knows the user is authenticated, this route redirects them to the requested
+ * destination or the dashboard.
  */
 export function GuestRoute({ children }: GuestRouteProps) {
   const router = useRouter();
 
   const { isLoading, isAuthenticated } = useAuth();
+  console.log("[GuestRoute]", {
+    isLoading,
+    isAuthenticated,
+    pathname: window.location.pathname,
+  });
+
+  const redirecting = useRef(false);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      const next = new URLSearchParams(window.location.search).get("next");
-
-      router.replace(sanitizeNextPath(next));
+    if (isLoading || !isAuthenticated || redirecting.current) {
+      return;
     }
+
+    redirecting.current = true;
+
+    const next = new URLSearchParams(window.location.search).get("next");
+    const destination = sanitizeNextPath(next);
+
+    console.log("[GuestRoute] redirecting authenticated user", {
+      next,
+      destination,
+    });
+
+    router.replace(destination);
   }, [isLoading, isAuthenticated, router]);
 
-  /*
-   * Both branches render the same pending state: one is "we don't know yet",
-   * the other is "we know, and a redirect is in flight". Rendering `null` in
-   * either case produced a blank flash.
-   */
   if (isLoading) {
     return <AuthPending />;
   }
