@@ -14,44 +14,44 @@ async function bootstrap() {
 
   const appConfig = app.get(AppConfigService);
 
-  app.enableCors({
-    origin: (requestOrigin: string | undefined, callback: (err: Error | null, allow?: boolean | string) => void) => {
-      if (!requestOrigin) {
-        return callback(null, true);
-      }
+  
+app.enableCors({
+  origin: (requestOrigin, callback) => {
+    if (!requestOrigin) {
+      return callback(null, true);
+    }
 
-      const allowedOrigins = appConfig.frontendUrl
-        .split(',')
-        .map((origin) => origin.trim())
-        .filter(Boolean);
+    const allowedOrigins = appConfig.frontendUrl
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean);
 
-      if (allowedOrigins.includes(requestOrigin)) {
-        return callback(null, true);
-      }
+    const isAllowed = allowedOrigins.includes(requestOrigin);
 
-      // Allow Vercel preview deployments matching the app pattern
-      if (
-        (requestOrigin.includes('apexx9-architecture-booking') ||
-          requestOrigin.includes('architecture-booking')) &&
-        requestOrigin.endsWith('.vercel.app')
-      ) {
-        return callback(null, true);
-      }
-
-      // Try to match any vercel.app origin with architecture-booking in name
+    const isVercelPreview = (() => {
       try {
-        const parsed = new URL(requestOrigin);
-        if (parsed.hostname.endsWith('vercel.app') && parsed.hostname.includes('architecture-booking')) {
-          return callback(null, true);
-        }
-      } catch {
-        // ignore
-      }
+        const url = new URL(requestOrigin);
 
-      return callback(null, allowedOrigins[0] || appConfig.frontendUrl);
-    },
-    credentials: true,
-  });
+        return (
+          url.protocol === 'https:' &&
+          url.hostname.endsWith('.vercel.app') &&
+          url.hostname.includes('architecture-booking')
+        );
+      } catch {
+        return false;
+      }
+    })();
+
+    if (isAllowed || isVercelPreview) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+});
 
   app.useGlobalPipes(
     new ValidationPipe({
