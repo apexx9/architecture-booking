@@ -4,7 +4,14 @@ export function isNodeEnv(value: unknown): value is NodeEnv {
   return value === 'development' || value === 'test' || value === 'production';
 }
 
-const REQUIRED_VARIABLES = ['DATABASE_URL', 'JWT_ACCESS_SECRET'] as const;
+/*
+ * NODE_ENV is required rather than defaulted. Several decisions key off it:
+ * whether cookies get the Secure attribute, and whether the CORS layer accepts
+ * private-range origins for local device testing. Defaulting a missing value to
+ * "development" would quietly enable that origin relaxation on a host that
+ * never set the variable, so an unset NODE_ENV has to be a startup error.
+ */
+const REQUIRED_VARIABLES = ['DATABASE_URL', 'JWT_ACCESS_SECRET', 'NODE_ENV'] as const;
 
 function describeValue(value: unknown): string {
   return value === undefined

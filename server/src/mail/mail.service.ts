@@ -55,13 +55,20 @@ export class MailService {
         to: [{ email }],
         subject: 'Verify your email',
         htmlContent: `
-          <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; color: #1a1a1a;">
-            <h1 style="font-size: 24px; font-weight: 600; margin-bottom: 16px;">Verify your email</h1>
-            <p style="font-size: 16px; line-height: 1.5; margin-bottom: 24px;">Thanks for signing up! Click the button below to verify your email address.</p>
-            <div style="margin-bottom: 24px;">
-              <a href="${verificationUrl}" style="display: inline-block; background-color: #1a1a1a; color: #ffffff; padding: 12px 24px; border-radius: 4px; text-decoration: none; font-weight: 500;">Verify email</a>
+          <div style="font-family: 'Segoe UI', Arial, sans-serif; background: #f6f3ee; padding: 32px 20px; color: #1a1a1a;">
+            <div style="max-width: 640px; margin: 0 auto; background: #ffffff; border: 1px solid #e7e1d8; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(26, 26, 26, 0.04);">
+              <div style="padding: 24px 28px 18px; background: #111111;">
+                <div style="font-size: 28px; line-height: 1; font-weight: 700; letter-spacing: -0.05em; color: #ffffff;">Renove<span style="font-size: 12px; vertical-align: top; margin-left: 2px;">®</span></div>
+              </div>
+              <div style="padding: 32px 28px 28px;">
+                <h1 style="font-size: 28px; line-height: 1.2; margin: 0 0 16px; font-weight: 700; color: #1a1a1a;">Verify your email</h1>
+                <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.7; color: #4b4b4b;">Thanks for signing up. Click below to verify your email and open your studio workspace.</p>
+                <div style="margin: 0 0 24px;">
+                  <a href="${verificationUrl}" style="display: inline-block; background-color: #1a1a1a; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600; letter-spacing: 0.01em;">Verify email</a>
+                </div>
+                <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6b6b6b;">This verification link expires in 24 hours.</p>
+              </div>
             </div>
-            <p style="font-size: 14px; color: #666666; line-height: 1.5;">This link expires in 24 hours.</p>
           </div>
         `,
         textContent: `Verify your email\n\nThanks for signing up! Verify your email here: ${verificationUrl}\n\nThis link expires in 24 hours.`,
@@ -90,14 +97,21 @@ export class MailService {
         to: [{ email }],
         subject: 'Reset your password',
         htmlContent: `
-          <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; color: #1a1a1a;">
-            <h1 style="font-size: 24px; font-weight: 600; margin-bottom: 16px;">Reset your password</h1>
-            <p style="font-size: 16px; line-height: 1.5; margin-bottom: 24px;">We received a request to reset your password. Click the button below to create a new password.</p>
-            <div style="margin-bottom: 24px;">
-              <a href="${resetUrl}" style="display: inline-block; background-color: #1a1a1a; color: #ffffff; padding: 12px 24px; border-radius: 4px; text-decoration: none; font-weight: 500;">Reset password</a>
+          <div style="font-family: 'Segoe UI', Arial, sans-serif; background: #f6f3ee; padding: 32px 20px; color: #1a1a1a;">
+            <div style="max-width: 640px; margin: 0 auto; background: #ffffff; border: 1px solid #e7e1d8; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(26, 26, 26, 0.04);">
+              <div style="padding: 24px 28px 18px; background: #111111;">
+                <div style="font-size: 28px; line-height: 1; font-weight: 700; letter-spacing: -0.05em; color: #ffffff;">Renove<span style="font-size: 12px; vertical-align: top; margin-left: 2px;">®</span></div>
+              </div>
+              <div style="padding: 32px 28px 28px;">
+                <h1 style="font-size: 28px; line-height: 1.2; margin: 0 0 16px; font-weight: 700; color: #1a1a1a;">Reset your password</h1>
+                <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.7; color: #4b4b4b;">We received a request to reset your password. Use the secure link below to choose a new one.</p>
+                <div style="margin: 0 0 24px;">
+                  <a href="${resetUrl}" style="display: inline-block; background-color: #1a1a1a; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600; letter-spacing: 0.01em;">Reset password</a>
+                </div>
+                <p style="margin: 0 0 10px; font-size: 14px; line-height: 1.6; color: #6b6b6b;">If you didn't request this, you can safely ignore this email.</p>
+                <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6b6b6b;">This reset link expires in 30 minutes.</p>
+              </div>
             </div>
-            <p style="font-size: 14px; color: #666666; line-height: 1.5; margin-bottom: 8px;">If you didn't request this, you can safely ignore this email.</p>
-            <p style="font-size: 14px; color: #666666; line-height: 1.5;">This link expires in 30 minutes.</p>
           </div>
         `,
         textContent: `Reset your password\n\nWe received a request to reset your password.\n\nReset here: ${resetUrl}\n\nThis link expires in 30 minutes.\n\nIf you didn't request this, you can safely ignore this email.`,

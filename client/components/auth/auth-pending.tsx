@@ -14,15 +14,23 @@ import Skeleton from "@/components/ui/skeleton";
 const AuthPending = () => (
   <div
     aria-busy="true"
-    className="flex min-h-dvh w-full flex-col items-center justify-center gap-6 bg-background px-6"
+    className="flex min-h-dvh w-full flex-col items-center justify-center bg-background px-6"
   >
-    <span className="sr-only">Checking your session…</span>
+    <div className="w-full max-w-xs rounded-md border border-line bg-surface p-5 shadow-[0_10px_30px_rgba(25,25,25,0.02)]">
+      <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-subtle">
+        Secure access
+      </p>
+      <h1 className="mt-3 text-[22px] font-medium tracking-[-0.04em] text-ink">
+        Checking your session…
+      </h1>
+      <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
+        We’re verifying your account and redirecting you back to your workspace.
+      </p>
 
-    <Skeleton className="h-6 w-28" />
-
-    <div className="w-full max-w-xs space-y-2.5">
-      <Skeleton className="h-3 w-full" />
-      <Skeleton className="h-3 w-4/5" />
+      <div className="mt-6 space-y-2.5">
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-4/5" />
+      </div>
     </div>
   </div>
 );
