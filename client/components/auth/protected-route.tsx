@@ -11,28 +11,27 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
+  console.log("🔥 [ProtectedRoute] COMPONENT EXECUTED");
+
   const router = useRouter();
   const { isLoading, isAuthenticated } = useAuth();
 
-  console.log("[ProtectedRoute]", {
+  console.log("🔥 [ProtectedRoute] AUTH STATE", {
     isLoading,
     isAuthenticated,
   });
 
   useEffect(() => {
-    console.log("[ProtectedRoute] effect", {
+    console.log("🔥 [ProtectedRoute] EFFECT", {
       isLoading,
       isAuthenticated,
     });
 
     if (!isLoading && !isAuthenticated) {
       const { pathname, search } = window.location;
-
       const next = currentLocationPath(pathname, search);
 
-      console.log("[ProtectedRoute] redirecting to login", {
-        pathname,
-        search,
+      console.log("🔥 [ProtectedRoute] REDIRECT", {
         next,
       });
 
@@ -41,20 +40,18 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }, [isLoading, isAuthenticated, router]);
 
   if (isLoading) {
-    console.log("[ProtectedRoute] rendering AuthPending because loading");
+    console.log("🔥 [ProtectedRoute] → LOADING");
 
     return <AuthPending />;
   }
 
   if (!isAuthenticated) {
-    console.log(
-      "[ProtectedRoute] rendering AuthPending because unauthenticated",
-    );
+    console.log("🔥 [ProtectedRoute] → UNAUTHENTICATED");
 
     return <AuthPending />;
   }
 
-  console.log("[ProtectedRoute] rendering protected children");
+  console.log("🔥 [ProtectedRoute] → AUTHENTICATED / CHILDREN");
 
   return children;
 }
