@@ -6,8 +6,6 @@ export default function WorkspaceLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  console.log("🔥 [WorkspaceLayout] COMPONENT EXECUTED");
-
   return (
     <ProtectedRoute>
       <AppShell>{children}</AppShell>
