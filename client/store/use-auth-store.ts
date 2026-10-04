@@ -27,59 +27,37 @@ const useAuthStore = create<AuthState>((set) => ({
   activeTenantId: null,
 
   setLoading: () => {
-    console.log("[AuthStore] setLoading");
-
     set({
       status: "loading",
     });
   },
 
   setAuthenticated: (user) => {
-    console.log("[AuthStore] setAuthenticated", user);
-
     set({
       status: "authenticated",
       user,
     });
-
-    console.log(
-      "[AuthStore] state after setAuthenticated:",
-      useAuthStore.getState(),
-    );
   },
 
   setUnauthenticated: () => {
-    console.log("[AuthStore] setUnauthenticated");
-
     set({
       status: "unauthenticated",
       user: null,
       tenants: EMPTY_TENANTS,
       activeTenantId: null,
     });
-
-    console.log(
-      "[AuthStore] state after setUnauthenticated:",
-      useAuthStore.getState(),
-    );
   },
 
   clearAuth: () => {
-    console.log("[AuthStore] clearAuth");
-
     set({
       status: "unauthenticated",
       user: null,
       tenants: EMPTY_TENANTS,
       activeTenantId: null,
     });
-
-    console.log("[AuthStore] state after clearAuth:", useAuthStore.getState());
   },
 
   setTenants: (tenants) => {
-    console.log("[AuthStore] setTenants", tenants);
-
     set((state) => ({
       tenants,
       activeTenantId:
@@ -89,13 +67,9 @@ const useAuthStore = create<AuthState>((set) => ({
           : ((tenants.find((tenant) => tenant.isDefault) ?? tenants[0])?.id ??
             null),
     }));
-
-    console.log("[AuthStore] state after setTenants:", useAuthStore.getState());
   },
 
   setActiveTenant: (tenantId) => {
-    console.log("[AuthStore] setActiveTenant", tenantId);
-
     set({
       activeTenantId: tenantId,
     });

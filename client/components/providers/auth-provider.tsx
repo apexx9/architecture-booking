@@ -16,35 +16,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     if (initialized.current) {
-      console.log("[AuthProvider] bootstrap skipped — already initialized");
       return;
     }
 
     initialized.current = true;
 
     async function bootstrap() {
-      console.log("[AuthProvider] bootstrap: START");
-
       setLoading();
 
       try {
-        const user = await authService.getCurrentUser();
-
-        console.log("[AuthProvider] bootstrap: SUCCESS", user);
-
-        console.log(
-          "[AuthProvider] store after success:",
-          useAuthStore.getState(),
-        );
-      } catch (error) {
-        console.error("[AuthProvider] bootstrap: FAILED", error);
-
+        await authService.getCurrentUser();
+      } catch {
         setUnauthenticated();
-
-        console.log(
-          "[AuthProvider] store after failure:",
-          useAuthStore.getState(),
-        );
       }
     }
 
