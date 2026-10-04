@@ -62,13 +62,13 @@ export class OAuthController {
         error instanceof Error ? encodeURIComponent(error.message) : 'failed';
 
       return response.redirect(
-        `${this.appConfig.frontendUrl}/login?error=${reason}`,
+        `${this.appConfig.frontendBaseUrl}/login?error=${reason}`,
       );
     }
 
     this.setAuthCookies(response, result.accessToken, result.refreshToken);
 
-    return response.redirect(`${this.appConfig.frontendUrl}/dashboard`);
+    return response.redirect(`${this.appConfig.frontendBaseUrl}/dashboard`);
   }
 
   private setAuthCookies(

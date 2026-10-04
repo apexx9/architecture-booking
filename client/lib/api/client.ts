@@ -13,7 +13,20 @@ let refreshing: Promise<boolean> | null = null;
 let csrfToken: string | null = null;
 let csrfPromise: Promise<string> | null = null;
 
-const PUBLIC_AUTH_ENDPOINTS = ["/auth/login", "/auth/register"];
+/*
+ * Endpoints that are reachable without a session. A 401 from any of these is a
+ * real answer about the request, so the interceptor must reject it rather than
+ * spend a refresh call on it. `verify-email` and `resend-verification` belong
+ * here: without them a rejected token triggers `POST /auth/refresh` and then
+ * replays the original request, which burns a second single-use token attempt
+ * and buries the real error under an unrelated refresh failure.
+ */
+const PUBLIC_AUTH_ENDPOINTS = [
+  "/auth/login",
+  "/auth/register",
+  "/auth/verify-email",
+  "/auth/resend-verification",
+];
 
 const NON_MUTATING_METHODS = ["GET", "HEAD", "OPTIONS"];
 

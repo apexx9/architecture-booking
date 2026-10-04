@@ -40,12 +40,31 @@ export class AppConfigService {
      * missing FRONTEND_URL produced a CORS origin nothing was served from, which
      * fails silently: every credentialed request is blocked and Set-Cookie is
      * discarded, so auth looks broken with no error in either console.
+     *
+     * Each entry is trimmed and stripped of trailing slashes. A browser never
+     * sends an `Origin` with a trailing slash, so `https://renove.app/` would
+     * otherwise fail the allowlist comparison against `https://renove.app`.
      */
     const url = this.configService.getOrThrow<string>(
       'FRONTEND_URL',
       'http://localhost:3000',
     );
-    return url;
+
+    return url
+      .split(',')
+      .map((origin) => origin.trim().replace(/\/+$/, ''))
+      .filter(Boolean)
+      .join(',');
+  }
+
+  /*
+   * Single origin for building links that leave the server, such as the
+   * verification and password-reset URLs. `frontendUrl` may list several
+   * origins for CORS, and concatenating that list into a link yields a URL no
+   * browser can resolve, so link building always uses the first entry.
+   */
+  get frontendBaseUrl(): string {
+    return this.frontendUrl.split(',')[0] ?? 'http://localhost:3000';
   }
 
   get databaseUrl(): string {

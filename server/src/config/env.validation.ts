@@ -66,6 +66,47 @@ export function validateEnv(
     );
   }
 
+  /*
+   * Every session cookie is issued with `secure` in production, so an explicit
+   * `COOKIE_SECURE=false` there means the browser silently discards each
+   * Set-Cookie. Nothing errors: requests go out unauthenticated and every
+   * protected call comes back 401, which reads as a broken API rather than a
+   * cookie misconfiguration. Refuse to start instead.
+   */
+  if (nodeEnv === 'production' && cookieSecure === 'false') {
+    errors.push(
+      'COOKIE_SECURE must be "true" in production. Cookies issued without the ' +
+        'Secure attribute are dropped over HTTPS, so no session would persist.',
+    );
+  }
+
+  /*
+   * `SameSite=None` is the only value that lets the browser attach session and
+   * CSRF cookies to cross-site XHR, and browsers refuse `None` without `Secure`.
+   * Setting `none` without `true` produces the same silent total auth failure.
+   */
+  if (sameSite === 'none' && cookieSecure !== 'true') {
+    errors.push(
+      'COOKIE_SAME_SITE=none requires COOKIE_SECURE=true. Browsers reject a ' +
+        'SameSite=None cookie that is not also Secure.',
+    );
+  }
+
+  /*
+   * Only reachable when the web app and API sit on different registrable
+   * domains. `lax` withholds the CSRF cookie from cross-site XHR, so the
+   * double-submit check fails on every mutating request, including the email
+   * verification call, and the browser reports only "link invalid or expired".
+   * Requiring the pair explicitly turns that into a startup error.
+   */
+  if (nodeEnv === 'production' && sameSite === 'lax' && config.CROSS_SITE === 'true') {
+    errors.push(
+      'CROSS_SITE=true requires COOKIE_SAME_SITE=none. With lax, the browser ' +
+        'will not send the CSRF cookie on cross-site requests and every ' +
+        'mutating endpoint will reject them.',
+    );
+  }
+
   if (errors.length > 0) {
     throw new Error(
       [

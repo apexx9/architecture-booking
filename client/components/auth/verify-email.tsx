@@ -7,13 +7,51 @@ import VerifyImage from "@/public/assets/arch-2.jpg";
 import Input from "@/components/ui/input";
 import Button from "@/components/ui/button";
 import { AuthShell } from "@/components/auth/auth-shell";
-import { getApiErrorMessage } from "@/lib/api/errors";
+import { classifyApiError, getApiErrorMessage, type ClassifiedApiError } from "@/lib/api/errors";
 import { authService } from "@/services/auth.service";
 import { sanitizeNextPath, buildAuthHref } from "@/lib/auth/redirect";
 import { resendVerificationSchema } from "@/schema/auth.schema";
 import { APP_NAME } from "@/utils/utils";
 
 type Status = "idle" | "verifying" | "verified" | "failed";
+
+type VerificationOutcome =
+  | { status: "verified" }
+  | { status: "failed"; failure: ClassifiedApiError };
+
+const verificationRequests = new Map<string, Promise<VerificationOutcome>>();
+
+/*
+ * A verification token is single-use, so the request must be issued exactly
+ * once per token per page session. React StrictMode mounts effects twice in
+ * development, and a remount re-runs this effect, so an in-flight guard alone
+ * is not enough: whichever effect is torn down would leave the page stuck on
+ * "verifying". Sharing one promise per token lets every mount await the same
+ * request and apply its single outcome. The entry is dropped once settled so
+ * revisiting a link retries rather than replaying a stale verdict.
+ */
+function requestVerification(token: string): Promise<VerificationOutcome> {
+  const inFlight = verificationRequests.get(token);
+
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const request = authService
+    .verifyEmail({ token })
+    .then((): VerificationOutcome => ({ status: "verified" }))
+    .catch((caught): VerificationOutcome => ({
+      status: "failed",
+      failure: classifyApiError(caught),
+    }))
+    .finally(() => {
+      verificationRequests.delete(token);
+    });
+
+  verificationRequests.set(token, request);
+
+  return request;
+}
 
 function VerifyEmailContent() {
   const router = useRouter();
@@ -24,7 +62,7 @@ function VerifyEmailContent() {
   const nextPath = sanitizeNextPath(searchParams.get("next"));
 
   const [status, setStatus] = useState<Status>(token ? "verifying" : "idle");
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<ClassifiedApiError | null>(null);
 
   const [resendEmail, setResendEmail] = useState(email);
   const [resendState, setResendState] = useState<
@@ -39,22 +77,20 @@ function VerifyEmailContent() {
 
     let cancelled = false;
 
-    async function verify() {
-      try {
-        await authService.verifyEmail({ token: token as string });
-
-        if (!cancelled) {
-          setStatus("verified");
-        }
-      } catch (caught) {
-        if (!cancelled) {
-          setError(getApiErrorMessage(caught));
-          setStatus("failed");
-        }
+    void requestVerification(token).then((outcome) => {
+      if (cancelled) {
+        return;
       }
-    }
 
-    void verify();
+      if (outcome.status === "verified") {
+        setStatus("verified");
+
+        return;
+      }
+
+      setFailure(outcome.failure);
+      setStatus("failed");
+    });
 
     return () => {
       cancelled = true;
@@ -87,6 +123,35 @@ function VerifyEmailContent() {
     }
   }
 
+  /*
+   * The link is only "invalid or expired" when the server actually said so.
+   * Reporting that verdict for a request that never reached the API sends
+   * people to resend a perfectly good link, so transport failures get their
+   * own copy and anything else non-401 stays deliberately non-committal.
+   */
+  const failureSubtitle = (() => {
+    if (status !== "failed") {
+      return null;
+    }
+
+    if (!failure || failure.kind === "unreachable") {
+      return "We couldn't reach the server. Check your connection, then try again.";
+    }
+
+    if (failure.status === 401) {
+      return "That link is invalid or has expired.";
+    }
+
+    return "We couldn't verify this link. Request a new one below.";
+  })();
+
+  const subtitle =
+    status === "verifying"
+      ? "Checking your verification link..."
+      : status === "verified"
+        ? "Your account is active. Taking you to sign in..."
+        : (failureSubtitle ?? "We sent a verification link to your email address.");
+
   return (
     <AuthShell
       heroImage={VerifyImage.src}
@@ -107,19 +172,13 @@ function VerifyEmailContent() {
           </h1>
 
           <p className="mt-1 text-[13px] text-ink-muted sm:text-[14px] lg:text-[15px]">
-            {status === "verifying"
-              ? "Checking your verification link..."
-              : status === "verified"
-                ? "Your account is active. Taking you to sign in..."
-                : status === "failed"
-                  ? "That link is invalid or has expired."
-                  : "We sent a verification link to your email address."}
+            {subtitle}
           </p>
         </div>
 
-        {error ? (
+        {failure?.serverMessage ? (
           <p role="alert" className="mt-2 text-[13px] text-danger">
-            {error}
+            {failure.serverMessage}
           </p>
         ) : null}
 

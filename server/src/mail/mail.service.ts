@@ -41,7 +41,7 @@ export class MailService {
   }
 
   async sendVerificationEmail(email: string, token: string) {
-    const verificationUrl = `${this.appConfig.frontendUrl}/verify-email?token=${encodeURIComponent(token)}`;
+    const verificationUrl = `${this.appConfig.frontendBaseUrl}/verify-email?token=${encodeURIComponent(token)}`;
     if (!this.canDeliver) {
       this.deliverOrLog(verificationUrl, `Verification email for ${email}`);
       return;
@@ -76,7 +76,7 @@ export class MailService {
   }
 
   async sendPasswordResetEmail(email: string, token: string) {
-    const resetUrl = `${this.appConfig.frontendUrl}/reset-password?token=${encodeURIComponent(token)}`;
+    const resetUrl = `${this.appConfig.frontendBaseUrl}/reset-password?token=${encodeURIComponent(token)}`;
     if (!this.canDeliver) {
       this.deliverOrLog(resetUrl, `Password reset email for ${email}`);
       return;
