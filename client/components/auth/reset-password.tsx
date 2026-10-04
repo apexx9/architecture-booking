@@ -88,10 +88,10 @@ function ResetPasswordContent() {
       >
         <div className="flex flex-col">
           <h1 className="text-[28px] leading-[1.1] font-medium tracking-tight text-ink sm:text-[32px] lg:text-[36px]">
-            New password
+            Set your new password
           </h1>
           <p className="mt-1 text-[13px] text-ink-muted sm:text-[14px] lg:text-[15px]">
-            At least 8 characters, including a letter and a number.
+            Create a secure password with at least 8 characters, including a letter and a number.
           </p>
         </div>
 
@@ -108,7 +108,7 @@ function ResetPasswordContent() {
             type="password"
             label="New password"
             autoComplete="new-password"
-            placeholder="At least 8 characters"
+            placeholder="Enter new password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             error={fieldErrors.password}
@@ -121,7 +121,7 @@ function ResetPasswordContent() {
             type="password"
             label="Confirm password"
             autoComplete="new-password"
-            placeholder="Repeat your password"
+            placeholder="Confirm your password"
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
             error={fieldErrors.confirmPassword}
@@ -135,7 +135,7 @@ function ResetPasswordContent() {
             loading={isSubmitting}
             className="w-full"
           >
-            {isSubmitting ? "Updating…" : "Reset password"}
+            {isSubmitting ? "Updating..." : "Reset password"}
           </Button>
         </div>
 

@@ -111,10 +111,10 @@ const ForgotPassword = () => {
       >
         <div className="flex flex-col">
           <h1 className="text-[28px] leading-[1.1] font-medium tracking-tight text-ink sm:text-[32px] lg:text-[36px]">
-            Reset password
+            Forgot password?
           </h1>
           <p className="mt-1 text-[13px] text-ink-muted sm:text-[14px] lg:text-[15px]">
-            Enter the email linked to your account.
+            Enter your email address and we'll send you a reset link.
           </p>
         </div>
 
@@ -125,7 +125,7 @@ const ForgotPassword = () => {
             type="email"
             label="Email"
             autoComplete="email"
-            placeholder="you@studio.com"
+            placeholder="you@company.com"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             error={fieldError}
@@ -145,7 +145,7 @@ const ForgotPassword = () => {
             loading={isSubmitting}
             className="w-full"
           >
-            {isSubmitting ? "Sending…" : "Send reset link"}
+            {isSubmitting ? "Sending..." : "Send reset link"}
           </Button>
         </div>
 

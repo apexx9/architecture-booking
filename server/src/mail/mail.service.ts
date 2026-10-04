@@ -54,8 +54,17 @@ export class MailService {
         },
         to: [{ email }],
         subject: 'Verify your email',
-        htmlContent: `<p>Verify your email address.</p><p><a href="${verificationUrl}">Click here to verify</a></p><p>Expires in 24 hours.</p>`,
-        textContent: `Verify: ${verificationUrl}`,
+        htmlContent: `
+          <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; color: #1a1a1a;">
+            <h1 style="font-size: 24px; font-weight: 600; margin-bottom: 16px;">Verify your email</h1>
+            <p style="font-size: 16px; line-height: 1.5; margin-bottom: 24px;">Thanks for signing up! Click the button below to verify your email address.</p>
+            <div style="margin-bottom: 24px;">
+              <a href="${verificationUrl}" style="display: inline-block; background-color: #1a1a1a; color: #ffffff; padding: 12px 24px; border-radius: 4px; text-decoration: none; font-weight: 500;">Verify email</a>
+            </div>
+            <p style="font-size: 14px; color: #666666; line-height: 1.5;">This link expires in 24 hours.</p>
+          </div>
+        `,
+        textContent: `Verify your email\n\nThanks for signing up! Verify your email here: ${verificationUrl}\n\nThis link expires in 24 hours.`,
       });
       this.logger.log(`Verification email accepted by Brevo for ${email}`);
     } catch (err) {
@@ -80,8 +89,18 @@ export class MailService {
         },
         to: [{ email }],
         subject: 'Reset your password',
-        htmlContent: `<p>We received a request to reset your password.</p><p><a href="${resetUrl}">Reset password</a></p><p>Expires in 30 minutes.</p>`,
-        textContent: `Reset: ${resetUrl}`,
+        htmlContent: `
+          <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; color: #1a1a1a;">
+            <h1 style="font-size: 24px; font-weight: 600; margin-bottom: 16px;">Reset your password</h1>
+            <p style="font-size: 16px; line-height: 1.5; margin-bottom: 24px;">We received a request to reset your password. Click the button below to create a new password.</p>
+            <div style="margin-bottom: 24px;">
+              <a href="${resetUrl}" style="display: inline-block; background-color: #1a1a1a; color: #ffffff; padding: 12px 24px; border-radius: 4px; text-decoration: none; font-weight: 500;">Reset password</a>
+            </div>
+            <p style="font-size: 14px; color: #666666; line-height: 1.5; margin-bottom: 8px;">If you didn't request this, you can safely ignore this email.</p>
+            <p style="font-size: 14px; color: #666666; line-height: 1.5;">This link expires in 30 minutes.</p>
+          </div>
+        `,
+        textContent: `Reset your password\n\nWe received a request to reset your password.\n\nReset here: ${resetUrl}\n\nThis link expires in 30 minutes.\n\nIf you didn't request this, you can safely ignore this email.`,
       });
       this.logger.log(`Password reset email accepted by Brevo for ${email}`);
     } catch (err) {
