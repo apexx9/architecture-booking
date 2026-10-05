@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   ArrowRightLeft,
   Check,
-  MapPin,
   Pencil,
-  Phone,
   Plus,
   Trash2,
   Users,
@@ -14,14 +13,19 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import Button from "@/components/ui/button";
-import Card, { CardBody, CardHeader } from "@/components/ui/card";
 import Dialog from "@/components/ui/dialog";
 import EmptyState from "@/components/ui/empty-state";
 import Input from "@/components/ui/input";
 import Select from "@/components/ui/select";
 import Textarea from "@/components/ui/textarea";
 import SearchField from "@/components/ui/search-field";
+import Skeleton from "@/components/ui/skeleton";
 import StatusBadge from "@/components/ui/status-badge";
+import DataView from "@/components/workspace/data-view";
+import { ErrorState, InlineError } from "@/components/workspace/error-state";
+import { FilterChips } from "@/components/workspace/filter-chips";
+import PageHeader from "@/components/workspace/page-header";
+import PageToolbar from "@/components/workspace/page-toolbar";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { pluralise } from "@/lib/format";
 import {
@@ -90,6 +94,7 @@ const LeadsPage = () => {
   const [nameLookupFailed, setNameLookupFailed] = useState(false);
 
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<LeadStatus | "all">("all");
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Lead | null>(null);
@@ -269,7 +274,10 @@ const LeadsPage = () => {
       setSubmitting(true);
 
       if (editing) {
-        const updated = await leadsService.update(editing.id, editPayload(form));
+        const updated = await leadsService.update(
+          editing.id,
+          editPayload(form),
+        );
 
         setLeads((prev) =>
           prev.map((item) => (item.id === updated.id ? updated : item)),
@@ -410,15 +418,16 @@ const LeadsPage = () => {
    */
   const needle = query.trim().toLowerCase();
 
-  const visible = needle
-    ? leads.filter((lead) =>
-        [lead.name, lead.email, lead.company, lead.location]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(needle),
-      )
-    : leads;
+  const visible = leads.filter((lead) => {
+    if (statusFilter !== "all" && lead.status !== statusFilter) return false;
+    if (!needle) return true;
+
+    return [lead.name, lead.email, lead.company, lead.location]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(needle);
+  });
 
   const hasConvertedLead = visible.some(
     (lead) => lead.convertedToClientId !== null,
@@ -427,196 +436,158 @@ const LeadsPage = () => {
   return (
     <>
       <div className="mx-auto w-full max-w-[1400px] px-6 py-8 lg:px-10">
-        <header className="motion-enter flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="font-display text-[28px] font-light text-ink">Leads</h1>
-            <p className="mt-2 max-w-2xl text-pretty text-[14px] leading-relaxed text-ink-muted">
-              Every enquiry you are working, from first contact to signed-off
-              client.
-            </p>
-          </div>
-
-          <Button variant="primary" onClick={openCreate}>
-            <Plus className="size-4" aria-hidden="true" />
-            New lead
-          </Button>
-        </header>
+        <PageHeader
+          title="Leads"
+          description="Every enquiry you are working, from first contact to signed-off client."
+          actions={
+            <Button onClick={openCreate}>
+              <Plus className="size-4" aria-hidden="true" />
+              New lead
+            </Button>
+          }
+        />
 
         {actionError && (
-          <p
-            role="alert"
-            className="mt-4 rounded-sm border border-danger/30 bg-danger/10 px-3 py-2 text-[13px] text-danger"
-          >
-            {actionError}
-          </p>
+          <InlineError
+            title="Action failed"
+            detail={actionError}
+            className="mt-5"
+          />
         )}
 
-        {!loading && leads.length > 0 && (
-          <div className="mt-6 max-w-sm motion-enter">
-            <SearchField
-              label="Search leads"
-              placeholder="Search by name, email or company"
-              value={query}
-              onChange={setQuery}
+        {loading ? (
+          <LeadsSkeleton />
+        ) : loadError && leads.length === 0 ? (
+          <ErrorState
+            title="Couldn't load leads"
+            description="We couldn't retrieve your enquiries right now."
+            detail={loadError}
+            onRetry={load}
+            className="border-t border-line"
+          />
+        ) : leads.length === 0 ? (
+          <div className="mt-6">
+            <EmptyState
+              icon={<Users className="size-4" aria-hidden="true" />}
+              title="No leads yet"
+              description="A lead is an enquiry you are still working. Record it here, work it to a decision, then convert it into a client when it is signed off."
+              action={
+                <Button onClick={openCreate}>
+                  <Plus className="size-4" aria-hidden="true" />
+                  New lead
+                </Button>
+              }
             />
           </div>
-        )}
-
-        <Card className="mt-6 motion-enter">
-          <CardHeader
-            title="All leads"
-            description={
-              loading
-                ? "Loading…"
-                : `${pluralise(visible.length, "lead")}${
-                    needle && visible.length !== leads.length
-                      ? ` of ${leads.length}`
-                      : ""
-                  }`
-            }
-          />
-
-          <CardBody>
-            {loading ? (
-              <div
-                role="status"
-                className="py-8 text-center text-[14px] text-ink-subtle"
-              >
-                Loading…
-              </div>
-            ) : loadError && leads.length === 0 ? (
-              <EmptyState
-                title="Could not load leads"
-                description={loadError}
-                tone="error"
-                size="sm"
-                action={
-                  <Button variant="secondary" onClick={load}>
-                    Try again
-                  </Button>
-                }
+        ) : (
+          <>
+            <PageToolbar
+              className="mt-6"
+              count={
+                needle || statusFilter !== "all"
+                  ? `${visible.length} of ${leads.length}`
+                  : pluralise(leads.length, "lead")
+              }
+              filters={
+                <FilterChips
+                  label="Filter by status"
+                  allLabel="All statuses"
+                  options={LEAD_STATUS_OPTIONS.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                    count: leads.filter((lead) => lead.status === option.value)
+                      .length,
+                  }))}
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                />
+              }
+            >
+              <SearchField
+                label="Search leads"
+                placeholder="Name, email, company or location"
+                value={query}
+                onChange={setQuery}
               />
-            ) : leads.length === 0 ? (
-              <EmptyState
-                icon={<Users className="size-4" aria-hidden="true" />}
-                title="No leads yet"
-                description="Add an enquiry to start tracking it through to a client."
-                size="sm"
-                action={
-                  <Button variant="primary" onClick={openCreate}>
-                    <Plus className="size-4" aria-hidden="true" />
-                    New lead
-                  </Button>
-                }
-              />
-            ) : needle && visible.length === 0 ? (
-              <EmptyState
-                title="No matching leads"
-                description={`Nothing matches “${query.trim()}”.`}
-                size="sm"
-                action={
-                  <Button variant="secondary" onClick={() => setQuery("")}>
-                    Clear search
-                  </Button>
-                }
-              />
-            ) : (
-              <>
-                {nameLookupFailed && hasConvertedLead && (
-                  <p className="mb-3 text-[13px] text-ink-subtle">
-                    Client details could not be loaded, so converted leads below
-                    cannot be named.
-                  </p>
-                )}
+            </PageToolbar>
 
-                <ul className="space-y-2">
-                  {visible.map((lead) => {
-                    const converted = convertedClient(lead);
+            {nameLookupFailed && hasConvertedLead && (
+              <p className="mt-4 text-[13px] text-ink-subtle">
+                Client details could not be loaded, so converted leads cannot be
+                named.
+              </p>
+            )}
+
+            <div className="mt-6">
+              {visible.length === 0 ? (
+                <EmptyState
+                  title="Nothing matches"
+                  description="No lead matches the current search and filter."
+                  size="sm"
+                  action={
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setQuery("");
+                        setStatusFilter("all");
+                      }}
+                    >
+                      Clear search and filter
+                    </Button>
+                  }
+                />
+              ) : (
+                <DataView<Lead>
+                  label="Leads"
+                  rows={visible}
+                  rowKey={(lead) => lead.id}
+                  primary={(lead) => lead.name}
+                  secondary={(lead) =>
+                    [lead.company, lead.location].filter(Boolean).join(" · ") ||
+                    "No company or location recorded"
+                  }
+                  meta={(lead) => (
+                    <>
+                      <StatusBadge status={lead.status} />
+
+                      {lead.source && (
+                        <Badge tone="neutral">
+                          {getLeadSourceLabel(lead.source)}
+                        </Badge>
+                      )}
+
+                      {lead.convertedToClientId && (
+                        <span className="inline-flex items-center gap-1 text-[12px] text-ink">
+                          <Check
+                            className="size-3.5 text-positive"
+                            aria-hidden="true"
+                          />
+                          {convertedClient(lead)
+                            ? "Converted"
+                            : "Converted to a client"}
+                        </span>
+                      )}
+                    </>
+                  )}
+                  actions={(lead) => {
                     const isPending = pending?.id === lead.id;
-                    const busyAction = isPending ? pending.action : null;
 
                     return (
-                      <li
-                        key={lead.id}
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-line p-3"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="truncate text-[14px] font-medium text-ink">
-                              {lead.name}
-                            </span>
+                      <>
+                        <Select
+                          aria-label={`Status for ${lead.name}`}
+                          options={LEAD_STATUS_OPTIONS}
+                          value={lead.status}
+                          size="sm"
+                          fullWidth={false}
+                          disabled={isPending}
+                          onChange={(value) =>
+                            updateStatus(lead, value as LeadStatus)
+                          }
+                          className="w-[136px]"
+                        />
 
-                            <StatusBadge status={lead.status} />
-
-                            {lead.source && (
-                              <Badge tone="neutral">
-                                {getLeadSourceLabel(lead.source)}
-                              </Badge>
-                            )}
-                          </div>
-
-                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-subtle">
-                            {lead.email && (
-                              <span className="truncate">{lead.email}</span>
-                            )}
-                            {lead.phone && (
-                              <span className="inline-flex items-center gap-1">
-                                <Phone
-                                  className="size-3.5"
-                                  aria-hidden="true"
-                                />
-                                {lead.phone}
-                              </span>
-                            )}
-                            {lead.company && (
-                              <span className="truncate">{lead.company}</span>
-                            )}
-                            {lead.location && (
-                              <span className="inline-flex items-center gap-1">
-                                <MapPin
-                                  className="size-3.5"
-                                  aria-hidden="true"
-                                />
-                                {lead.location}
-                              </span>
-                            )}
-                          </div>
-
-                          {lead.convertedToClientId && (
-                            <p className="mt-1 inline-flex items-center gap-1 text-[13px] text-ink">
-                              <Check
-                                className="size-3.5 text-positive"
-                                aria-hidden="true"
-                              />
-                              {converted ? (
-                                <>
-                                  Converted to{" "}
-                                  <span className="font-medium">
-                                    {converted.name}
-                                  </span>
-                                </>
-                              ) : (
-                                "Converted to a client"
-                              )}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="flex shrink-0 flex-wrap items-center gap-2">
-                          <Select
-                            aria-label={`Status for ${lead.name}`}
-                            options={LEAD_STATUS_OPTIONS}
-                            value={lead.status}
-                            size="sm"
-                            fullWidth={false}
-                            disabled={isPending}
-                            onChange={(value) =>
-                              updateStatus(lead, value as LeadStatus)
-                            }
-                            className="w-[148px]"
-                          />
-
-                          {/*
+                        {/*
                             Conversion is gated purely on whether it has already
                             happened. Gating it on a "closed" status set was a
                             rule invented in this layer, and it contradicted the
@@ -624,50 +595,111 @@ const LeadsPage = () => {
                             every legitimately converted lead was treated as
                             unconvertible.
                           */}
-                          {!lead.convertedToClientId && (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              loading={busyAction === "convert"}
-                              disabled={isPending}
-                              onClick={() => setConvertTarget(lead)}
-                            >
-                              <ArrowRightLeft
-                                className="size-4"
-                                aria-hidden="true"
-                              />
-                              Convert
-                            </Button>
-                          )}
-
+                        {!lead.convertedToClientId && (
                           <Button
                             size="sm"
-                            variant="tertiary"
+                            variant="secondary"
+                            loading={pending?.action === "convert" && isPending}
                             disabled={isPending}
-                            onClick={() => openEdit(lead)}
-                            aria-label={`Edit ${lead.name}`}
+                            onClick={() => setConvertTarget(lead)}
                           >
-                            <Pencil className="size-4" aria-hidden="true" />
+                            <ArrowRightLeft
+                              className="size-4"
+                              aria-hidden="true"
+                            />
+                            Convert
                           </Button>
+                        )}
 
-                          <Button
-                            size="sm"
-                            variant="tertiary"
-                            disabled={isPending}
-                            onClick={() => setRemoveTarget(lead)}
-                            aria-label={`Delete ${lead.name}`}
-                          >
-                            <Trash2 className="size-4" aria-hidden="true" />
-                          </Button>
-                        </div>
-                      </li>
+                        <Button
+                          size="sm"
+                          variant="tertiary"
+                          disabled={isPending}
+                          onClick={() => openEdit(lead)}
+                          aria-label={`Edit ${lead.name}`}
+                        >
+                          <Pencil className="size-4" aria-hidden="true" />
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="tertiary"
+                          disabled={isPending}
+                          onClick={() => setRemoveTarget(lead)}
+                          aria-label={`Delete ${lead.name}`}
+                        >
+                          <Trash2 className="size-4" aria-hidden="true" />
+                        </Button>
+                      </>
                     );
-                  })}
-                </ul>
-              </>
-            )}
-          </CardBody>
-        </Card>
+                  }}
+                  columns={[
+                    { key: "name", header: "Lead", cell: (lead) => lead.name },
+                    {
+                      key: "status",
+                      header: "Status",
+                      width: "w-28",
+                      cell: (lead) => <StatusBadge status={lead.status} />,
+                    },
+                    {
+                      key: "source",
+                      header: "Source",
+                      width: "w-32",
+                      hideBelowLg: true,
+                      cell: (lead) =>
+                        lead.source ? (
+                          <Badge tone="neutral">
+                            {getLeadSourceLabel(lead.source)}
+                          </Badge>
+                        ) : (
+                          "—"
+                        ),
+                    },
+                    {
+                      key: "contact",
+                      header: "Contact",
+                      hideBelowLg: true,
+                      cell: (lead) => lead.email ?? lead.phone ?? "—",
+                    },
+                    {
+                      key: "location",
+                      header: "Location",
+                      hideBelowMd: true,
+                      cell: (lead) => lead.location ?? "—",
+                    },
+                    {
+                      key: "converted",
+                      header: "Converted",
+                      hideBelowMd: true,
+                      cell: (lead) => {
+                        if (!lead.convertedToClientId) return "—";
+
+                        const converted = convertedClient(lead);
+
+                        return converted ? (
+                          <Link
+                            href={`/clients/${converted.id}`}
+                            className="inline-flex items-center gap-1 rounded-sm text-ink underline-offset-4 transition-colors hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                          >
+                            <Check
+                              className="size-3.5 text-positive"
+                              aria-hidden="true"
+                            />
+                            {converted.name}
+                          </Link>
+                        ) : (
+                          <span className="text-ink-subtle">
+                            Client removed
+                          </span>
+                        );
+                      },
+                    },
+                  ]}
+                />
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       <Dialog
@@ -713,9 +745,7 @@ const LeadsPage = () => {
             name="name"
             label="Name"
             value={form.name}
-            onChange={(event) =>
-              setForm({ ...form, name: event.target.value })
-            }
+            onChange={(event) => setForm({ ...form, name: event.target.value })}
             data-autofocus
             required
           />
@@ -890,12 +920,25 @@ const LeadsPage = () => {
         }
       >
         <p className="text-[13px] leading-relaxed text-ink-muted">
-          <span className="font-medium text-ink">{removeTarget?.name}</span> will
-          be permanently deleted. This cannot be undone.
+          <span className="font-medium text-ink">{removeTarget?.name}</span>{" "}
+          will be permanently deleted. This cannot be undone.
         </p>
       </Dialog>
     </>
   );
 };
+
+/**
+ * Mirrors the settled page — toolbar rule, then a table — so the transition
+ * does not reflow.
+ */
+const LeadsSkeleton = () => (
+  <div className="mt-6" aria-busy="true">
+    <span className="sr-only">Loading leads…</span>
+
+    <Skeleton className="h-14 w-full" />
+    <Skeleton className="mt-6 h-72 w-full" />
+  </div>
+);
 
 export default LeadsPage;

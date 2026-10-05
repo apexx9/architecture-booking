@@ -14,7 +14,8 @@ interface AuthState {
   setUnauthenticated: () => void;
   clearAuth: () => void;
 
-  setTenants: (tenants: TenantSummary[]) => void;
+  /** Replaces the whole list. Also accepts an updater, for adding or removing one. */
+  setTenants: (tenants: TenantSummary[] | ((previous: TenantSummary[]) => TenantSummary[])) => void;
   setActiveTenant: (tenantId: string) => void;
 }
 
@@ -57,17 +58,25 @@ const useAuthStore = create<AuthState>((set) => ({
     });
   },
 
-  setTenants: (tenants) => {
-    set((state) => ({
-      tenants,
-      activeTenantId:
-        state.activeTenantId &&
-        tenants.some((tenant) => tenant.id === state.activeTenantId)
-          ? state.activeTenantId
-          : ((tenants.find((tenant) => tenant.isDefault) ?? tenants[0])?.id ??
-            null),
-    }));
-  },
+setTenants: (tenants) => {
+      set((state) => {
+        const next =
+          typeof tenants === "function" ? tenants(state.tenants) : tenants;
+
+        return {
+          tenants: next,
+          // Keeps the active practice only if it still exists in the new list,
+          // so removing a membership cannot leave the workspace pointing at a
+          // tenant the API will now reject every query for.
+          activeTenantId:
+            state.activeTenantId &&
+            next.some((tenant) => tenant.id === state.activeTenantId)
+              ? state.activeTenantId
+              : ((next.find((tenant) => tenant.isDefault) ?? next[0])?.id ??
+                null),
+        };
+      });
+    },
 
   setActiveTenant: (tenantId) => {
     set({

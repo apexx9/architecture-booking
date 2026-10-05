@@ -5,11 +5,12 @@ import { LogOut, ShieldCheck } from "lucide-react";
 
 import Badge from "@/components/ui/badge";
 import Button from "@/components/ui/button";
-import Card, { CardBody, CardHeader } from "@/components/ui/card";
+
 import Dialog from "@/components/ui/dialog";
 import EmptyState from "@/components/ui/empty-state";
 import Tooltip from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
+import { Section, SectionHeader } from "@/components/workspace/section";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { formatDate } from "@/lib/format";
 import { authService } from "@/services/auth.service";
@@ -91,10 +92,10 @@ export default function AccountCard() {
 
   return (
     <>
-      <Card className="motion-enter">
-        <CardHeader title="Account" description="Your sign-in details." />
+      <Section className="motion-enter">
+        <SectionHeader title="Account" description="Your sign-in details." />
 
-        <CardBody>
+        <div className="mt-5">
           {loading ? (
             <div
               role="status"
@@ -126,11 +127,15 @@ export default function AccountCard() {
 
                 <div className="flex flex-wrap items-baseline justify-between gap-2 py-3">
                   <dt className="text-[13px] text-ink-subtle">Email</dt>
-                  <dd className="text-[14px] text-ink break-all">{user.email}</dd>
+                  <dd className="text-[14px] text-ink break-all">
+                    {user.email}
+                  </dd>
                 </div>
 
                 <div className="flex flex-wrap items-baseline justify-between gap-2 py-3">
-                  <dt className="text-[13px] text-ink-subtle">Email verified</dt>
+                  <dt className="text-[13px] text-ink-subtle">
+                    Email verified
+                  </dt>
                   <dd className="text-[14px] text-ink">
                     {user.emailVerifiedAt ? (
                       `Verified ${formatDate(user.emailVerifiedAt) ?? ""}`.trim()
@@ -208,8 +213,8 @@ export default function AccountCard() {
               )}
             </>
           )}
-        </CardBody>
-      </Card>
+        </div>
+      </Section>
 
       <Dialog
         open={confirming}
@@ -237,8 +242,8 @@ export default function AccountCard() {
         }
       >
         <p className="text-[13px] leading-relaxed text-ink-muted">
-          Every session ends, on this device and any other. You will need to sign
-          in again.
+          Every session ends, on this device and any other. You will need to
+          sign in again.
         </p>
       </Dialog>
     </>

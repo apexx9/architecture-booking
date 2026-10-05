@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Archive,
-  ChevronRight,
   FileCheck2,
   ListChecks,
   Paperclip,
@@ -14,16 +13,26 @@ import {
 } from "lucide-react";
 
 import Button from "@/components/ui/button";
-import Card, { CardBody, CardHeader } from "@/components/ui/card";
 import Dialog from "@/components/ui/dialog";
 import EmptyState from "@/components/ui/empty-state";
 import Select from "@/components/ui/select";
+import Skeleton from "@/components/ui/skeleton";
 import Tabs from "@/components/ui/tabs";
 import StatusBadge from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
+import DataView from "@/components/workspace/data-view";
+import { ErrorState, InlineError } from "@/components/workspace/error-state";
+import PageHeader from "@/components/workspace/page-header";
+import { Section, SectionHeader } from "@/components/workspace/section";
 import ProjectFormDialog from "@/components/project/project-form-dialog";
 import { getApiErrorMessage } from "@/lib/api/errors";
-import { formatAmount, formatBytes, formatDate, formatDateRange, pluralise } from "@/lib/format";
+import {
+  formatAmount,
+  formatBytes,
+  formatDate,
+  formatDateRange,
+  pluralise,
+} from "@/lib/format";
 import { toStatusOptions } from "@/lib/domain/status";
 import {
   PROJECT_STATUSES,
@@ -32,10 +41,14 @@ import {
   type ProjectStatus,
 } from "@/services/projects.service";
 import { clientsService, type Client } from "@/services/clients.service";
-import { deliverablesService, type Deliverable } from "@/services/deliverables.service";
+import {
+  deliverablesService,
+  type Deliverable,
+} from "@/services/deliverables.service";
 import { filesService, type FileRecord } from "@/services/files.service";
 import { tasksService, type Task } from "@/services/tasks.service";
 import { phasesService, type ProjectPhase } from "@/services/phases.service";
+import { useCrumbStore } from "@/store/use-crumb-store";
 
 const PROJECT_STATUS_OPTIONS = toStatusOptions(PROJECT_STATUSES);
 
@@ -56,6 +69,20 @@ interface ProjectDetailProps {
  * and the rows link back to the pages that own editing. An inline status
  * control here would imply a move that is not happening.
  */
+const ProjectDetailSkeleton = () => (
+  <div
+    className="mx-auto w-full max-w-[1400px] px-6 py-8 lg:px-10"
+    aria-busy="true"
+  >
+    <span className="sr-only">Loading project…</span>
+
+    <Skeleton className="h-4 w-40" />
+    <Skeleton className="mt-4 h-9 w-72" />
+    <Skeleton className="mt-4 h-4 w-96 max-w-full" />
+    <Skeleton className="mt-8 h-64 w-full" />
+  </div>
+);
+
 const ProjectDetail = ({ projectId }: ProjectDetailProps) => {
   const [project, setProject] = useState<Project | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
@@ -74,6 +101,8 @@ const ProjectDetail = ({ projectId }: ProjectDetailProps) => {
 
   const { toast } = useToast();
   const router = useRouter();
+  const setTrail = useCrumbStore((state) => state.setTrail);
+  const clearTrail = useCrumbStore((state) => state.clearTrail);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -133,7 +162,7 @@ const ProjectDetail = ({ projectId }: ProjectDetailProps) => {
   }, [load]);
 
   const client = project?.clientId
-    ? clients.find((item) => item.id === project.clientId) ?? null
+    ? (clients.find((item) => item.id === project.clientId) ?? null)
     : null;
 
   const phaseName = (phaseId?: string | null) =>
@@ -216,37 +245,37 @@ const ProjectDetail = ({ projectId }: ProjectDetailProps) => {
     }
   };
 
+  /**
+   * The context bar sits above every route and cannot know this project's name,
+   * so the page publishes its own trail and clears it on the way out — which
+   * also covers the case where loading fails and there is no name to show.
+   */
+  useEffect(() => {
+    if (!project) return;
+
+    setTrail([
+      { label: "Projects", href: "/projects" },
+      { label: project.name },
+    ]);
+
+    return clearTrail;
+  }, [project, setTrail, clearTrail]);
+
   if (loading) {
-    return (
-      <div
-        role="status"
-        className="mx-auto w-full max-w-[1400px] px-6 py-8 text-[14px] text-ink-subtle lg:px-10"
-      >
-        Loading…
-      </div>
-    );
+    return <ProjectDetailSkeleton />;
   }
 
   if (loadError || !project) {
     return (
       <div className="mx-auto w-full max-w-[1400px] px-6 py-8 lg:px-10">
-        <EmptyState
-          title="Could not load this project"
-          description={loadError ?? "The project was not found."}
-          tone="error"
-          action={
-            <div className="flex flex-wrap justify-center gap-2">
-              <Button variant="secondary" onClick={load}>
-                Try again
-              </Button>
-              <Link
-                href="/projects"
-                className="inline-flex items-center rounded-sm border border-line px-3 py-2 text-[13px] text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-              >
-                Back to projects
-              </Link>
-            </div>
-          }
+        <ErrorState
+          title="Couldn't load this project"
+          description="We couldn't retrieve the project and everything attached to it."
+          detail={loadError ?? undefined}
+          onRetry={load}
+          backHref="/projects"
+          backLabel="Back to projects"
+          className="border-t border-line"
         />
       </div>
     );
@@ -259,91 +288,67 @@ const ProjectDetail = ({ projectId }: ProjectDetailProps) => {
   return (
     <>
       <div className="mx-auto w-full max-w-[1400px] px-6 py-8 lg:px-10">
-        <nav aria-label="Breadcrumb" className="mb-4">
-          <ol className="flex flex-wrap items-center gap-1.5 text-[13px] text-ink-subtle">
-            <li>
-              <Link
-                href="/projects"
-                className="rounded-sm hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        <PageHeader
+          backHref="/projects"
+          backLabel="Projects"
+          title={project.name}
+          description={`${pluralise(tasks.length, "task")}, ${pluralise(
+            deliverables.length,
+            "deliverable",
+          )} and ${pluralise(files.length, "file")} attached to this project.`}
+          meta={[
+            { label: "Status", value: <StatusBadge status={project.status} /> },
+            {
+              label: "Client",
+              value: client ? (
+                <Link
+                  href={`/clients/${client.id}`}
+                  className="rounded-sm text-ink-muted underline-offset-4 transition-colors hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                >
+                  {client.name}
+                </Link>
+              ) : (
+                "None"
+              ),
+            },
+            ...(dates ? [{ label: "Dates", value: dates }] : []),
+            ...(budget ? [{ label: "Budget", value: `GH₵${budget}` }] : []),
+          ]}
+          actions={
+            <>
+              <Select
+                aria-label={`Status for ${project.name}`}
+                options={PROJECT_STATUS_OPTIONS}
+                value={project.status}
+                size="sm"
+                fullWidth={false}
+                disabled={statusBusy}
+                onChange={(value) => updateStatus(value as ProjectStatus)}
+                className="w-[148px]"
+              />
+
+              <Button variant="secondary" onClick={() => setEditOpen(true)}>
+                <Pencil className="size-4" aria-hidden="true" />
+                Edit
+              </Button>
+
+              <Button
+                variant="tertiary"
+                onClick={() => setArchiveTarget(project)}
+                aria-label={`Archive ${project.name}`}
               >
-                Projects
-              </Link>
-            </li>
-            <li aria-hidden="true">
-              <ChevronRight className="size-3.5" />
-            </li>
-            <li className="truncate text-ink">{project.name}</li>
-          </ol>
-        </nav>
-
-        <header className="motion-enter flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="font-display text-[28px] font-light text-ink">
-                {project.name}
-              </h1>
-
-              <StatusBadge status={project.status} />
-            </div>
-
-            {/* Budget and dates were collected by the form and then never shown
-                anywhere, so they read as decoration. */}
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-ink-subtle tabular-nums">
-              {client && (
-                <span>
-                  Client:{" "}
-                  <Link
-                    href="/clients"
-                    className="rounded-sm text-ink-muted hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                  >
-                    {client.name}
-                  </Link>
-                </span>
-              )}
-
-              {dates && <span>{dates}</span>}
-              {budget && <span>GH₵{budget}</span>}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Select
-              aria-label={`Status for ${project.name}`}
-              options={PROJECT_STATUS_OPTIONS}
-              value={project.status}
-              size="sm"
-              fullWidth={false}
-              disabled={statusBusy}
-              onChange={(value) => updateStatus(value as ProjectStatus)}
-              className="w-[148px]"
-            />
-
-            <Button
-              variant="secondary"
-              onClick={() => setEditOpen(true)}
-              aria-label={`Edit ${project.name}`}
-            >
-              <Pencil className="size-4" aria-hidden="true" />
-              Edit
-            </Button>
-
-            <Button
-              variant="tertiary"
-              onClick={() => setArchiveTarget(project)}
-              aria-label={`Archive ${project.name}`}
-            >
-              <Archive className="size-4" aria-hidden="true" />
-            </Button>
-          </div>
-        </header>
+                <Archive className="size-4" aria-hidden="true" />
+              </Button>
+            </>
+          }
+        />
 
         {actionError && (
-          <p
-            role="alert"
-            className="mt-4 rounded-sm border border-danger/30 bg-danger/10 px-3 py-2 text-[13px] text-danger"
-          >
-            {actionError}
-          </p>
+          <InlineError
+            title="Action failed"
+            detail={actionError}
+            className="mt-5"
+          />
         )}
 
         <Tabs
@@ -359,251 +364,330 @@ const ProjectDetail = ({ projectId }: ProjectDetailProps) => {
           ]}
           label="Project sections"
           defaultValue="overview"
-          className="mt-6"
+          className="mt-8"
         >
           {(active) => {
             if (active === "tasks") {
               return (
-                <Card>
-                  <CardHeader title="Tasks" />
-                  <CardBody>
-                    {tasks.length === 0 ? (
-                      <EmptyState
-                        icon={<ListChecks className="size-4" aria-hidden="true" />}
-                        title="No tasks on this project"
-                        description="Tasks are created from the Tasks page and belong to one project."
-                        size="sm"
-                        action={
-                          <Link
-                            href="/tasks"
-                            className="inline-flex items-center rounded-sm border border-line px-3 py-2 text-[13px] text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                          >
-                            Go to tasks
-                          </Link>
-                        }
-                      />
-                    ) : (
-                      <ul className="divide-y divide-line">
-                        {tasks.map((task) => {
-                          const phase = phaseName(task.phaseId);
+                <Section divided>
+                  <SectionHeader
+                    title="Tasks"
+                    description="Read-only here. Status and phase are edited from the Tasks page, which owns them."
+                  />
 
-                          return (
-                            <li
-                              key={task.id}
-                              className="py-3 first:pt-0 last:pb-0"
+                  <div className="mt-5">
+                    <DataView<Task>
+                      label="Tasks on this project"
+                      rows={tasks}
+                      rowKey={(task) => task.id}
+                      primary={(task) => task.title}
+                      secondary={(task) =>
+                        phaseName(task.phaseId) ?? "No phase"
+                      }
+                      meta={(task) => (
+                        <>
+                          <StatusBadge status={task.status} />
+                          <StatusBadge status={task.priority} />
+                          {task.dueDate && (
+                            <span className="text-[12px] text-ink-subtle tabular-nums">
+                              Due {formatDate(task.dueDate)}
+                            </span>
+                          )}
+                        </>
+                      )}
+                      empty={
+                        <EmptyState
+                          icon={
+                            <ListChecks className="size-4" aria-hidden="true" />
+                          }
+                          title="No tasks on this project"
+                          description="Tasks are created from the Tasks page and belong to exactly one project."
+                          size="sm"
+                          action={
+                            <Link
+                              href="/tasks"
+                              className="inline-flex items-center rounded-sm border border-line px-3 py-2 text-[13px] text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                             >
-                              <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className="truncate text-[14px] text-ink">
-                                    {task.title}
-                                  </span>
-
-                                  <StatusBadge status={task.status} />
-                                  <StatusBadge status={task.priority} />
-                                </div>
-
-                                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-subtle">
-                                  {phase && <span>{phase}</span>}
-
-                                  {task.dueDate && (
-                                    <span className="tabular-nums">
-                                      Due {formatDate(task.dueDate)}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </CardBody>
-                </Card>
+                              Go to tasks
+                            </Link>
+                          }
+                        />
+                      }
+                      columns={[
+                        {
+                          key: "title",
+                          header: "Task",
+                          cell: (task) => task.title,
+                        },
+                        {
+                          key: "status",
+                          header: "Status",
+                          width: "w-28",
+                          cell: (task) => <StatusBadge status={task.status} />,
+                        },
+                        {
+                          key: "priority",
+                          header: "Priority",
+                          width: "w-28",
+                          hideBelowLg: true,
+                          cell: (task) => (
+                            <StatusBadge status={task.priority} />
+                          ),
+                        },
+                        {
+                          key: "phase",
+                          header: "Phase",
+                          hideBelowLg: true,
+                          cell: (task) => phaseName(task.phaseId) ?? "—",
+                        },
+                        {
+                          key: "due",
+                          header: "Due",
+                          numeric: true,
+                          width: "w-32",
+                          hideBelowMd: true,
+                          cell: (task) => formatDate(task.dueDate) ?? "—",
+                        },
+                      ]}
+                    />
+                  </div>
+                </Section>
               );
             }
 
             if (active === "deliverables") {
               return (
-                <Card>
-                  <CardHeader title="Deliverables" />
-                  <CardBody>
-                    {deliverables.length === 0 ? (
-                      <EmptyState
-                        icon={
-                          <FileCheck2 className="size-4" aria-hidden="true" />
-                        }
-                        title="No deliverables on this project"
-                        description="Deliverables are created from the Deliverables page and belong to one project."
-                        size="sm"
-                        action={
-                          <Link
-                            href="/deliverables"
-                            className="inline-flex items-center rounded-sm border border-line px-3 py-2 text-[13px] text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                          >
-                            Go to deliverables
-                          </Link>
-                        }
-                      />
-                    ) : (
-                      <ul className="divide-y divide-line">
-                        {deliverables.map((deliverable) => {
-                          const phase = phaseName(deliverable.phaseId);
+                <Section divided>
+                  <SectionHeader
+                    title="Deliverables"
+                    description="Versions are managed by the server on upload, so they are shown rather than edited."
+                  />
 
-                          return (
-                            <li
-                              key={deliverable.id}
-                              className="py-3 first:pt-0 last:pb-0"
+                  <div className="mt-5">
+                    <DataView<Deliverable>
+                      label="Deliverables on this project"
+                      rows={deliverables}
+                      rowKey={(deliverable) => deliverable.id}
+                      primary={(deliverable) => deliverable.name}
+                      secondary={(deliverable) =>
+                        phaseName(deliverable.phaseId) ?? "No phase"
+                      }
+                      meta={(deliverable) => (
+                        <>
+                          <StatusBadge status={deliverable.status} />
+                          <span className="text-[12px] text-ink-subtle tabular-nums">
+                            v{deliverable.version}
+                          </span>
+                          {deliverable.dueDate && (
+                            <span className="text-[12px] text-ink-subtle tabular-nums">
+                              Due {formatDate(deliverable.dueDate)}
+                            </span>
+                          )}
+                        </>
+                      )}
+                      empty={
+                        <EmptyState
+                          icon={
+                            <FileCheck2 className="size-4" aria-hidden="true" />
+                          }
+                          title="No deliverables on this project"
+                          description="Deliverables are created from the Deliverables page and belong to exactly one project."
+                          size="sm"
+                          action={
+                            <Link
+                              href="/deliverables"
+                              className="inline-flex items-center rounded-sm border border-line px-3 py-2 text-[13px] text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                             >
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="truncate text-[14px] text-ink">
-                                  {deliverable.name}
-                                </span>
-
-                                <StatusBadge status={deliverable.status} />
-                              </div>
-
-                              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-subtle">
-                                <span className="tabular-nums">
-                                  v{deliverable.version}
-                                </span>
-                                {phase && <span>{phase}</span>}
-
-                                {deliverable.dueDate && (
-                                  <span className="tabular-nums">
-                                    Due {formatDate(deliverable.dueDate)}
-                                  </span>
-                                )}
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </CardBody>
-                </Card>
+                              Go to deliverables
+                            </Link>
+                          }
+                        />
+                      }
+                      columns={[
+                        {
+                          key: "name",
+                          header: "Deliverable",
+                          cell: (deliverable) => deliverable.name,
+                        },
+                        {
+                          key: "status",
+                          header: "Status",
+                          width: "w-28",
+                          cell: (deliverable) => (
+                            <StatusBadge status={deliverable.status} />
+                          ),
+                        },
+                        {
+                          key: "version",
+                          header: "Version",
+                          width: "w-20",
+                          numeric: true,
+                          cell: (deliverable) => `v${deliverable.version}`,
+                        },
+                        {
+                          key: "phase",
+                          header: "Phase",
+                          hideBelowLg: true,
+                          cell: (deliverable) =>
+                            phaseName(deliverable.phaseId) ?? "—",
+                        },
+                        {
+                          key: "due",
+                          header: "Due",
+                          numeric: true,
+                          width: "w-32",
+                          hideBelowMd: true,
+                          cell: (deliverable) =>
+                            formatDate(deliverable.dueDate) ?? "—",
+                        },
+                      ]}
+                    />
+                  </div>
+                </Section>
               );
             }
 
             if (active === "files") {
               return (
-                <Card>
-                  <CardHeader
+                <Section divided>
+                  <SectionHeader
                     title="Files"
-                    description={
-                      files.length > 0
-                        ? `${pluralise(files.length, "file")} on this project`
-                        : undefined
-                    }
+                    description="Everything uploaded against this project's deliverables."
                   />
-                  <CardBody>
-                    {files.length === 0 ? (
-                      <EmptyState
-                        icon={<Paperclip className="size-4" aria-hidden="true" />}
-                        title="No files yet"
-                        description="Files are attached from a deliverable, and are listed here as well as there."
-                        size="sm"
-                        action={
-                          <Link
-                            href="/deliverables"
-                            className="inline-flex items-center rounded-sm border border-line px-3 py-2 text-[13px] text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                          >
-                            Go to deliverables
-                          </Link>
-                        }
-                      />
-                    ) : (
-                      <ul className="divide-y divide-line">
-                        {files.map((file) => (
-                          <li
-                            key={file.id}
-                            className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
-                          >
-                            <div className="min-w-0">
-                              <p className="truncate text-[14px] text-ink">
-                                {file.originalName}
-                              </p>
-                              <p className="mt-0.5 text-[13px] text-ink-subtle tabular-nums">
-                                {formatBytes(file.size)} ·{" "}
-                                {formatDate(file.createdAt) ?? "—"}
-                              </p>
-                            </div>
 
-                            <Button
-                              size="sm"
-                              variant="tertiary"
-                              onClick={() => removeFile(file)}
-                              aria-label={`Remove ${file.originalName}`}
+                  <div className="mt-5">
+                    <DataView<FileRecord>
+                      label="Files on this project"
+                      rows={files}
+                      rowKey={(file) => file.id}
+                      primary={(file) => file.originalName}
+                      secondary={(file) => formatBytes(file.size)}
+                      meta={(file) => (
+                        <span className="text-[12px] text-ink-subtle tabular-nums">
+                          {formatDate(file.createdAt) ?? "—"}
+                        </span>
+                      )}
+                      actions={(file) => (
+                        <Button
+                          size="sm"
+                          variant="tertiary"
+                          onClick={() => removeFile(file)}
+                          aria-label={`Remove ${file.originalName}`}
+                        >
+                          <X className="size-4" aria-hidden="true" />
+                        </Button>
+                      )}
+                      empty={
+                        <EmptyState
+                          icon={
+                            <Paperclip className="size-4" aria-hidden="true" />
+                          }
+                          title="No files yet"
+                          description="Files are uploaded from a deliverable, and are listed here as well as there."
+                          size="sm"
+                          action={
+                            <Link
+                              href="/deliverables"
+                              className="inline-flex items-center rounded-sm border border-line px-3 py-2 text-[13px] text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                             >
-                              <X className="size-4" aria-hidden="true" />
-                            </Button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </CardBody>
-                </Card>
+                              Go to deliverables
+                            </Link>
+                          }
+                        />
+                      }
+                      columns={[
+                        {
+                          key: "name",
+                          header: "File",
+                          cell: (file) => file.originalName,
+                        },
+                        {
+                          key: "size",
+                          header: "Size",
+                          numeric: true,
+                          width: "w-24",
+                          cell: (file) => formatBytes(file.size),
+                        },
+                        {
+                          key: "added",
+                          header: "Added",
+                          numeric: true,
+                          hideBelowMd: true,
+                          cell: (file) => formatDate(file.createdAt) ?? "—",
+                        },
+                      ]}
+                    />
+                  </div>
+                </Section>
               );
             }
 
             return (
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader title="Details" />
-                  <CardBody>
-                    <dl className="divide-y divide-line">
-                      <div className="flex flex-wrap items-baseline justify-between gap-2 py-3 first:pt-0">
-                        <dt className="text-[13px] text-ink-subtle">Status</dt>
-                        <dd>
-                          <StatusBadge status={project.status} />
-                        </dd>
-                      </div>
+              <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:gap-12">
+                <Section divided>
+                  <SectionHeader title="Details" />
 
-                      <div className="flex flex-wrap items-baseline justify-between gap-2 py-3">
-                        <dt className="text-[13px] text-ink-subtle">Client</dt>
-                        <dd className="text-[14px] text-ink">
-                          {client ? client.name : "None"}
-                        </dd>
-                      </div>
+                  <dl className="mt-5 divide-y divide-line">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2 py-3 first:pt-0">
+                      <dt className="text-[13px] text-ink-subtle">Status</dt>
+                      <dd>
+                        <StatusBadge status={project.status} />
+                      </dd>
+                    </div>
 
-                      <div className="flex flex-wrap items-baseline justify-between gap-2 py-3">
-                        <dt className="text-[13px] text-ink-subtle">Start</dt>
-                        <dd className="text-[14px] text-ink tabular-nums">
-                          {formatDate(project.startDate) ?? "Not set"}
-                        </dd>
-                      </div>
+                    <div className="flex flex-wrap items-baseline justify-between gap-2 py-3">
+                      <dt className="text-[13px] text-ink-subtle">Client</dt>
+                      <dd className="text-[14px] text-ink">
+                        {client ? (
+                          <Link
+                            href={`/clients/${client.id}`}
+                            className="rounded-sm underline-offset-4 transition-colors hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                          >
+                            {client.name}
+                          </Link>
+                        ) : (
+                          "None"
+                        )}
+                      </dd>
+                    </div>
 
-                      <div className="flex flex-wrap items-baseline justify-between gap-2 py-3">
-                        <dt className="text-[13px] text-ink-subtle">End</dt>
-                        <dd className="text-[14px] text-ink tabular-nums">
-                          {formatDate(project.endDate) ?? "Not set"}
-                        </dd>
-                      </div>
+                    <div className="flex flex-wrap items-baseline justify-between gap-2 py-3">
+                      <dt className="text-[13px] text-ink-subtle">Start</dt>
+                      <dd className="text-[14px] text-ink tabular-nums">
+                        {formatDate(project.startDate) ?? "Not set"}
+                      </dd>
+                    </div>
 
-                      <div className="flex flex-wrap items-baseline justify-between gap-2 py-3 last:pb-0">
-                        <dt className="text-[13px] text-ink-subtle">Budget</dt>
-                        <dd className="text-[14px] text-ink tabular-nums">
-                          {budget ? `GH₵${budget}` : "Not set"}
-                        </dd>
-                      </div>
-                    </dl>
-                  </CardBody>
-                </Card>
+                    <div className="flex flex-wrap items-baseline justify-between gap-2 py-3">
+                      <dt className="text-[13px] text-ink-subtle">End</dt>
+                      <dd className="text-[14px] text-ink tabular-nums">
+                        {formatDate(project.endDate) ?? "Not set"}
+                      </dd>
+                    </div>
 
-                <Card>
-                  <CardHeader title="Description" />
-                  <CardBody>
-                    {project.description ? (
-                      <p className="text-[14px] leading-relaxed whitespace-pre-line text-ink-muted">
-                        {project.description}
-                      </p>
-                    ) : (
-                      <p className="text-[13px] text-ink-subtle">
-                        No description yet. Use Edit to add one.
-                      </p>
-                    )}
-                  </CardBody>
-                </Card>
+                    <div className="flex flex-wrap items-baseline justify-between gap-2 py-3 last:pb-0">
+                      <dt className="text-[13px] text-ink-subtle">Budget</dt>
+                      <dd className="text-[14px] text-ink tabular-nums">
+                        {budget ? `GH₵${budget}` : "Not set"}
+                      </dd>
+                    </div>
+                  </dl>
+                </Section>
+
+                <Section divided>
+                  <SectionHeader title="Brief" />
+
+                  {project.description ? (
+                    <p className="mt-5 text-[14px] leading-relaxed whitespace-pre-line text-ink-muted">
+                      {project.description}
+                    </p>
+                  ) : (
+                    <p className="mt-5 text-[13px] text-ink-subtle">
+                      No brief written yet. Use Edit to describe what this
+                      project is for.
+                    </p>
+                  )}
+                </Section>
               </div>
             );
           }}
@@ -649,8 +733,8 @@ const ProjectDetail = ({ projectId }: ProjectDetailProps) => {
         <div className="space-y-3 text-[13px] leading-relaxed text-ink-muted">
           <p>
             <span className="font-medium text-ink">{project.name}</span> will be
-            removed from the projects list. Archiving keeps the project, its tasks,
-            deliverables and files.
+            removed from the projects list. Archiving keeps the project, its
+            tasks, deliverables and files.
           </p>
 
           <p>You will be taken back to the projects list afterwards.</p>

@@ -1,443 +1,554 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  CalendarClock,
-  CheckCircle2,
-  FolderKanban,
-  ListChecks,
-  Sparkles,
-  UserPlus,
-} from "lucide-react";
+import { useState } from "react";
+import { ArrowRight, Plus } from "lucide-react";
 
-import Card, { CardBody, CardHeader } from "@/components/ui/card";
+import Button from "@/components/ui/button";
 import EmptyState from "@/components/ui/empty-state";
+import SearchField from "@/components/ui/search-field";
+import Skeleton from "@/components/ui/skeleton";
 import StatusBadge from "@/components/ui/status-badge";
-import { getApiErrorMessage } from "@/lib/api/errors";
-import { formatDate, pluralise } from "@/lib/format";
-import { getStatusPresentation, type AnyStatus } from "@/lib/domain/status";
-import { projectsService, type Project } from "@/services/projects.service";
-import { tasksService, type Task } from "@/services/tasks.service";
-import {
-  deliverablesService,
-  type Deliverable,
-} from "@/services/deliverables.service";
-import { leadsService, type Lead } from "@/services/leads.service";
-import { clientsService, type Client } from "@/services/clients.service";
+import ProjectFormDialog from "@/components/project/project-form-dialog";
+import { useToast } from "@/components/ui/toast";
+import { formatDate } from "@/lib/format";
+import DataView, { type DataColumn } from "@/components/workspace/data-view";
+import { ErrorState } from "@/components/workspace/error-state";
+import PageHeader from "@/components/workspace/page-header";
+import { Section, SectionHeader } from "@/components/workspace/section";
+import { Stat, StatStrip, type StatTone } from "@/components/workspace/stat";
+import useDashboardData, {
+  type ProjectRollup,
+} from "@/hooks/use-dashboard-data";
+import type { Project } from "@/services/projects.service";
 
-/** Statuses that mean the work is finished and it should stop nagging. */
-const CLOSED_TASK_STATUSES: Task["status"][] = ["DONE", "CANCELLED"];
+/** Time-of-day greeting, so the header reads as a moment rather than a title. */
+function greeting(now: Date) {
+  const hour = now.getHours();
 
-type Breakdown = {
-  status: AnyStatus;
-  count: number;
-}[];
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+
+  return "Good evening";
+}
 
 /**
- * Counts per status, ordered by the vocabulary's own progression rather than by
- * size — a list sorted by frequency makes "Urgent" disappear below the fold.
+ * The dashboard is a command centre, not a set of boxes.
+ *
+ * The order is deliberate and answers, in sequence: what needs me, what is
+ * running, what is due, and where the pipeline stands. It replaced a page that
+ * led with an onboarding checklist and then showed status counts — which told a
+ * returning user nothing they could act on.
+ *
+ * Two constraints shape everything here:
+ *
+ * 1. Nothing is invented. Every number comes from `useDashboardData`, which
+ *    derives it from the API's own records. There is no revenue, margin,
+ *    utilisation or "project health" score, because none of those can be
+ *    computed from what the API returns without guessing at a schedule baseline
+ *    the product has not defined.
+ * 2. Empty is not zero. An attention item is shown only when it means
+ *    something. A row of "0"s is noise that teaches the user to ignore the row.
  */
-const byStatus = <T extends { status: AnyStatus }>(items: T[]): Breakdown => {
-  const counts = new Map<AnyStatus, number>();
-
-  for (const item of items) {
-    counts.set(item.status, (counts.get(item.status) ?? 0) + 1);
-  }
-
-  return [...counts.entries()]
-    .map(([status, count]) => ({ status, count }))
-    .sort((a, b) =>
-      getStatusPresentation(a.status).label.localeCompare(
-        getStatusPresentation(b.status).label,
-      ),
-    );
-};
-
 const DashboardPage = () => {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
+  const { data, loading, error, reload } = useDashboardData();
+  const { toast } = useToast();
 
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  /** Taken once per load so "overdue" cannot flip between renders. */
-  const [now, setNow] = useState(0);
+  const [query, setQuery] = useState("");
+  const [creating, setCreating] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
-    setLoadError(null);
+  const handleCreated = (project: Project) => {
+    setCreating(false);
 
-    try {
-      const [projectData, taskData, deliverableData, leadData, clientData] =
-        await Promise.all([
-          projectsService.list(),
-          tasksService.list(),
-          deliverablesService.list(),
-          leadsService.getAll(),
-          clientsService.getAll(),
-        ]);
+    toast({
+      tone: "success",
+      title: "Project created",
+      description: project.name,
+    });
 
-      setProjects(projectData);
-      setTasks(taskData);
-      setDeliverables(deliverableData);
-      setLeads(leadData);
-      setClients(clientData);
-      setNow(Date.now());
-    } catch (error) {
-      setLoadError(getApiErrorMessage(error));
-    } finally {
-      setLoading(false);
-    }
+    reload();
   };
 
-  useEffect(() => {
-    let cancelled = false;
+  if (loading) return <DashboardSkeleton />;
 
-    const run = async () => {
-      if (cancelled) return;
-      await load();
-    };
+  if (error && !data) {
+    return (
+      <div className="mx-auto w-full max-w-[1400px] px-6 py-8 lg:px-10">
+        <PageHeader title="Dashboard" />
+        <ErrorState
+          title="Couldn't load your practice"
+          description="We couldn't retrieve your projects, tasks and leads."
+          detail={error}
+          onRetry={reload}
+          className="mt-6 border-t border-line"
+        />
+      </div>
+    );
+  }
 
-    run();
+  if (!data) return null;
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const projectName = (projectId: string) =>
-    projects.find((project) => project.id === projectId)?.name ?? null;
-
-  /*
-   * Everything below is a count or a date comparison over data the API already
-   * returns. There is no revenue, margin or utilisation figure here, because
-   * the API exposes none — a dashboard that showed them would be inventing the
-   * practice's economics.
-   */
-  const overdue = tasks.filter(
-    (task) =>
-      now > 0 &&
-      Boolean(task.dueDate) &&
-      !CLOSED_TASK_STATUSES.includes(task.status) &&
-      new Date(task.dueDate ?? now).getTime() < now,
-  );
-
-  const upcoming = tasks
-    .filter((task) => {
-      if (!task.dueDate) return false;
-      if (CLOSED_TASK_STATUSES.includes(task.status)) return false;
-
-      const time = new Date(task.dueDate as string).getTime();
-
-      return time >= now && time < now + 7 * 24 * 60 * 60 * 1000;
-    })
-    .sort(
-      (a, b) =>
-        new Date(a.dueDate ?? now).getTime() -
-        new Date(b.dueDate ?? now).getTime(),
-    )
-    .slice(0, 6);
-
-  const hasAnyData =
-    projects.length > 0 ||
-    tasks.length > 0 ||
-    deliverables.length > 0 ||
-    leads.length > 0 ||
-    clients.length > 0;
+  const clientName = (clientId?: string | null) =>
+    data.clients.find((client) => client.id === clientId)?.name ?? null;
 
   /*
-   * Each step is something the API genuinely supports, and each one is `done`
-   * only once the practice has actually done it. The list is shown while any
-   * step is outstanding, not only when everything is empty — a practice with a
-   * client but no projects still needs to be told about projects.
+   * Each entry is shown only when it counts something actionable. The tone marks
+   * the urgency, not the sentiment: overdue is danger because it is late, and
+   * due today is caution because it is imminent.
    */
-  const steps = [
+  interface Attention {
+    value: number;
+    label: string;
+    pluralLabel: string;
+    hint?: string;
+    href: string;
+    tone: StatTone;
+  }
+
+  const allAttention: Attention[] = [
     {
-      done: clients.length > 0,
-      href: "/clients",
-      title: "Add a client",
-      body: "Someone you have an engagement with. Projects can exist without one, but linking them makes the relationship visible.",
-    },
-    {
-      done: projects.length > 0,
-      href: "/projects",
-      title: "Create a project",
-      body: "One commission. It holds the tasks and deliverables that belong to it.",
-    },
-    {
-      done: tasks.length > 0,
+      value: data.overdueTasks.length,
+      label: "task overdue",
+      pluralLabel: "tasks overdue",
+      hint: "past its due date",
       href: "/tasks",
-      title: "Add tasks",
-      body: "The work itself, with a status, a priority and a due date.",
+      tone: "danger",
     },
     {
-      done: deliverables.length > 0,
+      value: data.dueToday.length,
+      label: "task due today",
+      pluralLabel: "tasks due today",
+      href: "/tasks",
+      tone: "warning",
+    },
+    {
+      value: data.awaitingClient.length,
+      label: "awaiting client",
+      pluralLabel: "awaiting client",
       href: "/deliverables",
-      title: "Track deliverables",
-      body: "Drawings, reports and issued documents, and where each one stands with the client.",
+      tone: "warning",
     },
     {
-      done: leads.length > 0,
+      value: data.newLeads.length,
+      label: "new lead",
+      pluralLabel: "new leads",
+      hint: "not yet contacted",
       href: "/leads",
-      title: "Capture leads",
-      body: "Enquiries that have not become clients yet. Convert one to carry its details across.",
+      tone: "neutral",
     },
   ];
 
-  const remainingSteps = steps.filter((step) => !step.done);
+  /*
+   * A count of zero is not information. Showing a row of nils teaches the user
+   * to stop reading the strip, which costs more than the empty space saves.
+   */
+  const attention = allAttention.filter((item) => item.value > 0);
+
+  const needle = query.trim().toLowerCase();
+
+  const projects = needle
+    ? data.liveProjects.filter((rollup) =>
+        [
+          rollup.project.name,
+          rollup.project.description,
+          clientName(rollup.project.clientId),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(needle),
+      )
+    : data.liveProjects;
+
+  if (data.isEmpty) return <Onboarding />;
 
   return (
     <div className="mx-auto w-full max-w-[1400px] px-6 py-8 lg:px-10">
-      <header className="motion-enter">
-        <h1 className="font-display text-[28px] font-light text-ink">
-          Dashboard
-        </h1>
-        <p className="mt-2 max-w-2xl text-pretty text-[14px] leading-relaxed text-ink-muted">
-          {hasAnyData
-            ? "Where your work stands right now."
-            : "Start here — set up your practice in the order that makes sense."}
-        </p>
-      </header>
+      <PageHeader
+        title={greeting(new Date())}
+        description="Where your practice stands, and what is waiting on you."
+        actions={
+          <Button onClick={() => setCreating(true)}>
+            <Plus className="size-4" aria-hidden="true" />
+            New project
+          </Button>
+        }
+      />
 
-      {loadError && (
-        <p
-          role="alert"
-          className="mt-4 rounded-sm border border-danger/30 bg-danger/10 px-3 py-2 text-[13px] text-danger"
-        >
-          {loadError}{" "}
-          <button
-            type="button"
-            onClick={load}
-            className="underline underline-offset-2"
-          >
-            Try again
-          </button>
-        </p>
+      {/* Kept out of PageHeader so it can sit directly under the title. */}
+      {attention.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-[12px] text-ink-subtle">Needs attention</h2>
+
+          <StatStrip label="Items needing attention" className="mt-2">
+            {attention.map((item) => (
+              <Stat
+                key={item.label}
+                value={item.value}
+                label={item.label}
+                pluralLabel={item.pluralLabel}
+                hint={item.hint}
+                tone={item.tone}
+                href={item.href}
+              />
+            ))}
+          </StatStrip>
+        </div>
       )}
 
-      {/* Onboarding. Every step is a real API capability; nothing here is a
-          placeholder for something the practice cannot actually do. */}
-      {!loading && remainingSteps.length > 0 && (
-        <Card className="mt-6 motion-enter">
-          <CardHeader
-            title="Get set up"
-            description={
-              remainingSteps.length === steps.length
-                ? "Five steps, in the order they depend on each other."
-                : `${pluralise(
-                    remainingSteps.length,
-                    "step",
-                  )} left, in the order they depend on each other.`
+      <Section className="mt-10" divided>
+        <SectionHeader
+          title="Live projects"
+          description={
+            data.liveProjects.length > 0
+              ? `${data.liveProjects.length} running. Overdue work first, then whatever is due soonest.`
+              : undefined
+          }
+          actions={
+            <>
+              {projects.length > 5 && (
+                <SearchField
+                  label="Search live projects"
+                  placeholder="Filter"
+                  value={query}
+                  onChange={setQuery}
+                  className="w-44"
+                />
+              )}
+
+              <Link
+                href="/projects"
+                className="inline-flex items-center gap-1 rounded-sm text-[13px] text-ink-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+              >
+                All projects
+                <ArrowRight className="size-3.5" aria-hidden="true" />
+              </Link>
+            </>
+          }
+        />
+
+        <div className="mt-5">
+          {projects.length === 0 ? (
+            needle ? (
+              <EmptyState
+                title={`Nothing matches “${query.trim()}”`}
+                description="Try a different name."
+                size="sm"
+                action={
+                  <Button variant="secondary" onClick={() => setQuery("")}>
+                    Clear search
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                title="No live projects"
+                description="Projects appear here while they are running. Finished ones move to the projects list."
+                size="sm"
+                action={
+                  <Link
+                    href="/projects"
+                    className="inline-flex items-center rounded-sm border border-line px-3 py-2 text-[13px] text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                  >
+                    Go to projects
+                  </Link>
+                }
+              />
+            )
+          ) : (
+            <DataView<ProjectRollup>
+              label="Live projects"
+              rowKey={(rollup) => rollup.project.id}
+              rowHref={(rollup) => `/projects/${rollup.project.id}`}
+              primary={(rollup) => rollup.project.name}
+              secondary={(rollup) =>
+                clientName(rollup.project.clientId) ?? "No client"
+              }
+              meta={(rollup) => (
+                <>
+                  <StatusBadge status={rollup.project.status} />
+                  {rollup.overdueCount > 0 && (
+                    <span className="text-[12px] text-danger">
+                      {rollup.overdueCount} overdue
+                    </span>
+                  )}
+                </>
+              )}
+              columns={projectColumns(clientName)}
+              rows={projects}
+            />
+          )}
+        </div>
+      </Section>
+
+      <div className="mt-10 grid gap-10 lg:grid-cols-2 lg:gap-12">
+        <Section divided>
+          <SectionHeader
+            title="Due soon"
+            description="Open tasks with a date, next seven days."
+            actions={
+              <Link
+                href="/tasks"
+                className="inline-flex items-center gap-1 rounded-sm text-[13px] text-ink-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+              >
+                All tasks
+                <ArrowRight className="size-3.5" aria-hidden="true" />
+              </Link>
             }
           />
-          <CardBody>
-            <ol className="space-y-3">
-              {steps.map((step) => (
-                <li
-                  key={step.title}
-                  className="flex flex-wrap items-start gap-3 rounded-sm border border-line p-3"
-                >
-                  <span className="mt-0.5 shrink-0">
-                    {step.done ? (
-                      <CheckCircle2
-                        className="size-5 text-ink-subtle"
-                        aria-hidden="true"
-                      />
-                    ) : (
-                      <Sparkles
-                        className="size-5 text-ink-subtle"
-                        aria-hidden="true"
-                      />
-                    )}
-                  </span>
 
-                  <div className="min-w-0 flex-1">
-                    <p className="flex flex-wrap items-center gap-2 text-[14px] text-ink">
-                      {step.title}
-                      {step.done && (
-                        <span className="text-[13px] text-ink-subtle">
-                          done
-                        </span>
-                      )}
-                    </p>
-
-                    <p className="mt-1 text-[13px] leading-relaxed text-ink-subtle">
-                      {step.body}
-                    </p>
-                  </div>
-
-                  <Link
-                    href={step.href}
-                    className="shrink-0 rounded-sm text-[13px] text-ink underline underline-offset-2 hover:text-ink-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          <div className="mt-4">
+            {data.dueThisWeek.length === 0 ? (
+              <EmptyState
+                title="Nothing due this week"
+                description="Open tasks with a due date inside seven days will appear here."
+                size="sm"
+              />
+            ) : (
+              <ul className="divide-y divide-line border-t border-line">
+                {data.dueThisWeek.slice(0, 7).map((task) => (
+                  <li
+                    key={task.id}
+                    className="flex items-baseline justify-between gap-4 py-2.5"
                   >
-                    {step.done ? "Add more" : "Start"}
+                    <span className="min-w-0 flex-1 truncate text-[14px] text-ink">
+                      {task.title}
+                    </span>
+
+                    <span className="flex shrink-0 items-center gap-2">
+                      <StatusBadge status={task.priority} />
+                      <span className="text-[13px] text-ink-subtle tabular-nums">
+                        {formatDate(task.dueDate)}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </Section>
+
+        <Section divided>
+          <SectionHeader
+            title="Pipeline"
+            description="Leads that have not reached an outcome."
+            actions={
+              <Link
+                href="/leads"
+                className="inline-flex items-center gap-1 rounded-sm text-[13px] text-ink-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+              >
+                All leads
+                <ArrowRight className="size-3.5" aria-hidden="true" />
+              </Link>
+            }
+          />
+
+          <div className="mt-4">
+            {data.openLeads.length === 0 ? (
+              <EmptyState
+                title="No open leads"
+                description="An enquiry stays here until it is won or lost."
+                size="sm"
+                action={
+                  <Link
+                    href="/leads"
+                    className="inline-flex items-center rounded-sm border border-line px-3 py-2 text-[13px] text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                  >
+                    Go to leads
                   </Link>
-                </li>
-              ))}
-            </ol>
-          </CardBody>
-        </Card>
-      )}
-
-      {loading ? (
-        <div
-          role="status"
-          className="mt-6 py-12 text-center text-[14px] text-ink-subtle"
-        >
-          Loading…
-        </div>
-      ) : hasAnyData ? (
-        <div className="motion-enter-stagger mt-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <Card style={{ "--reveal-index": 0 } as React.CSSProperties}>
-            <CardHeader
-              title="Deadlines"
-              description={
-                overdue.length > 0
-                  ? `${pluralise(overdue.length, "task")} overdue`
-                  : "Nothing overdue"
-              }
-            />
-            <CardBody>
-              {upcoming.length === 0 && overdue.length === 0 ? (
-                <EmptyState
-                  icon={<CalendarClock className="size-4" aria-hidden="true" />}
-                  title="No deadlines"
-                  description="Give a task a due date and it will show up here."
-                  size="sm"
-                  action={
-                    <Link
-                      href="/tasks"
-                      className="inline-flex items-center rounded-sm border border-line px-3 py-2 text-[13px] text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                    >
-                      Go to tasks
-                    </Link>
-                  }
-                />
-              ) : (
-                <ul className="divide-y divide-line">
-                  {[...overdue, ...upcoming].slice(0, 8).map((task) => (
-                    <li
-                      key={task.id}
-                      className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0 last:pb-0"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[14px] text-ink">
-                          {task.title}
-                        </p>
-
-                        <p className="mt-0.5 text-[13px] text-ink-subtle">
-                          {projectName(task.projectId) ?? "Unknown project"}
-                        </p>
-                      </div>
-
-                      <div className="flex shrink-0 items-center gap-2">
-                        <StatusBadge status={task.priority} />
-
-                        <span
-                          className={[
-                            "text-[13px] tabular-nums",
-                            overdue.includes(task)
-                              ? "text-danger"
-                              : "text-ink-subtle",
-                          ].join(" ")}
-                        >
-                          {formatDate(task.dueDate)}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardBody>
-          </Card>
-
-          <Card style={{ "--reveal-index": 1 } as React.CSSProperties}>
-            <CardHeader
-              title="Where your work stands"
-              description="Counts by status, from your own data"
-            />
-            <CardBody>
-              <div className="space-y-5">
-                <section>
-                  <h2 className="flex items-center gap-2 text-[13px] font-medium text-ink">
-                    <FolderKanban className="size-4" aria-hidden="true" />
-                    Projects
-                    <span className="text-ink-subtle tabular-nums">
-                      {projects.length}
+                }
+              />
+            ) : (
+              <ul className="divide-y divide-line border-t border-line">
+                {data.openLeads.slice(0, 7).map((lead) => (
+                  <li
+                    key={lead.id}
+                    className="flex items-baseline justify-between gap-4 py-2.5"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-[14px] text-ink">
+                      {lead.name}
                     </span>
-                  </h2>
 
-                  <StatusBreakdown items={byStatus(projects)} />
-                </section>
+                    <StatusBadge status={lead.status} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </Section>
+      </div>
 
-                <section>
-                  <h2 className="flex items-center gap-2 text-[13px] font-medium text-ink">
-                    <ListChecks className="size-4" aria-hidden="true" />
-                    Tasks
-                    <span className="text-ink-subtle tabular-nums">
-                      {tasks.length}
-                    </span>
-                  </h2>
-
-                  <StatusBreakdown items={byStatus(tasks)} />
-                </section>
-
-                <section>
-                  <h2 className="flex items-center gap-2 text-[13px] font-medium text-ink">
-                    <CalendarClock className="size-4" aria-hidden="true" />
-                    Deliverables
-                    <span className="text-ink-subtle tabular-nums">
-                      {deliverables.length}
-                    </span>
-                  </h2>
-
-                  <StatusBreakdown items={byStatus(deliverables)} />
-                </section>
-
-                <section>
-                  <h2 className="flex items-center gap-2 text-[13px] font-medium text-ink">
-                    <UserPlus className="size-4" aria-hidden="true" />
-                    Leads
-                    <span className="text-ink-subtle tabular-nums">
-                      {leads.length}
-                    </span>
-                  </h2>
-
-                  <StatusBreakdown items={byStatus(leads)} />
-                </section>
-              </div>
-            </CardBody>
-          </Card>
-        </div>
-      ) : null}
+      <ProjectFormDialog
+        open={creating}
+        clients={data.clients}
+        onClose={() => setCreating(false)}
+        onCreated={handleCreated}
+      />
     </div>
   );
 };
 
-/** Status pills with their counts. Empty states are stated, not padded out. */
-const StatusBreakdown = ({ items }: { items: Breakdown }) => {
-  if (items.length === 0) {
-    return <p className="mt-2 text-[13px] text-ink-subtle">None yet.</p>;
-  }
+/**
+ * Columns for the live-projects table.
+ *
+ * Built per render because two of them resolve a client name against the loaded
+ * clients.
+ *
+ * `Next due` and `Tasks` are computed rather than stored, so both are labelled
+ * for what they actually are. There is deliberately no "health" or "% complete"
+ * column: a percentage implies a schedule to compare against, and the API has no
+ * baseline for one.
+ */
+const projectColumns = (
+  clientName: (clientId?: string | null) => string | null,
+): DataColumn<ProjectRollup>[] => [
+  {
+    key: "project",
+    header: "Project",
+    cell: (rollup) => rollup.project.name,
+  },
+  {
+    key: "client",
+    header: "Client",
+    hideBelowLg: true,
+    cell: (rollup) => clientName(rollup.project.clientId) ?? "—",
+  },
+  {
+    key: "status",
+    header: "Status",
+    cell: (rollup) => <StatusBadge status={rollup.project.status} />,
+  },
+  {
+    key: "tasks",
+    header: "Tasks done",
+    align: "right",
+    numeric: true,
+    hideBelowMd: true,
+    cell: (rollup) => `${rollup.doneTasks}/${rollup.tasks.length}`,
+  },
+  {
+    key: "deliverables",
+    header: "Deliverables",
+    align: "right",
+    numeric: true,
+    hideBelowLg: true,
+    cell: (rollup) => rollup.deliverables.length,
+  },
+  {
+    key: "nextDue",
+    header: "Next due",
+    align: "right",
+    numeric: true,
+    cell: (rollup) =>
+      rollup.nextDue ? (
+        <span className={rollup.overdueCount > 0 ? "text-danger" : undefined}>
+          {formatDate(rollup.nextDue)}
+        </span>
+      ) : (
+        <span className="text-ink-subtle">—</span>
+      ),
+  },
+];
 
-  return (
-    <ul className="mt-2 flex flex-wrap gap-2">
-      {items.map((item) => (
+/**
+ * A practice with no records anywhere.
+ *
+ * Deliberately not a grid of empty modules. It states that the practice is ready,
+ * offers the two actions that actually unblock the product, and points at where
+ * everything else lives. Every destination here is a route that exists.
+ */
+const Onboarding = () => (
+  <div className="mx-auto w-full max-w-[1400px] px-6 py-8 lg:px-10">
+    <PageHeader
+      title="Your practice is ready to run"
+      description="Add a client and a project to start tracking the work behind them."
+    />
+
+    <ol className="mt-8 max-w-2xl divide-y divide-line border-y border-line">
+      {[
+        {
+          step: "First",
+          title: "Add a client",
+          body: "Someone you have an engagement with. Projects can exist without one, but linking them makes the relationship visible.",
+          href: "/clients",
+          cta: "Add a client",
+        },
+        {
+          step: "Then",
+          title: "Create a project",
+          body: "One commission. It holds the tasks and deliverables that belong to it.",
+          href: "/projects",
+          cta: "Create a project",
+        },
+        {
+          step: "Any time",
+          title: "Capture leads",
+          body: "Enquiries that have not become clients yet. Convert one when it does, to carry its details across.",
+          href: "/leads",
+          cta: "Go to leads",
+        },
+      ].map((item) => (
         <li
-          key={item.status}
-          className="inline-flex items-center gap-1.5 rounded-sm border border-line px-2 py-1"
+          key={item.title}
+          className="flex flex-wrap items-start gap-x-6 gap-y-3 py-5"
         >
-          <StatusBadge status={item.status} />
-          <span className="text-[13px] text-ink-subtle tabular-nums">
-            {item.count}
-          </span>
+          <p className="w-20 shrink-0 text-[12px] text-ink-subtle">
+            {item.step}
+          </p>
+
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-medium text-ink">{item.title}</p>
+            <p className="mt-1 max-w-xl text-[13px] leading-relaxed text-ink-muted">
+              {item.body}
+            </p>
+          </div>
+
+          <Link
+            href={item.href}
+            className="inline-flex shrink-0 items-center gap-1 rounded-sm text-[13px] text-ink underline-offset-4 transition-colors hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          >
+            {item.cta}
+            <ArrowRight className="size-3.5" aria-hidden="true" />
+          </Link>
         </li>
       ))}
-    </ul>
-  );
-};
+    </ol>
+  </div>
+);
+
+/**
+ * Mirrors the settled layout so the transition does not reflow.
+ *
+ * This deliberately does not skeleton a grid of cards — the page it loads no
+ * longer looks like that.
+ */
+const DashboardSkeleton = () => (
+  <div
+    className="mx-auto w-full max-w-[1400px] px-6 py-8 lg:px-10"
+    aria-busy="true"
+  >
+    <span className="sr-only">Loading your practice…</span>
+
+    <Skeleton className="h-7 w-56" />
+    <Skeleton className="mt-3 h-4 w-80" />
+
+    <Skeleton className="mt-8 h-16 w-full" />
+
+    <Skeleton className="mt-10 h-4 w-32" />
+    <Skeleton className="mt-4 h-56 w-full" />
+
+    <div className="mt-10 grid gap-10 lg:grid-cols-2">
+      <div>
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="mt-4 h-40 w-full" />
+      </div>
+
+      <div>
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="mt-4 h-40 w-full" />
+      </div>
+    </div>
+  </div>
+);
 
 export default DashboardPage;

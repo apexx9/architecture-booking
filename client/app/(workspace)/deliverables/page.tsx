@@ -1,20 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Archive, FileCheck2, Pencil, Plus, Upload, X } from "lucide-react";
 
+import Link from "next/link";
 import Badge from "@/components/ui/badge";
 import Button from "@/components/ui/button";
-import Card, { CardBody, CardHeader } from "@/components/ui/card";
 import DateInput from "@/components/ui/date-input";
 import Dialog from "@/components/ui/dialog";
 import EmptyState from "@/components/ui/empty-state";
 import Input from "@/components/ui/input";
 import SearchField from "@/components/ui/search-field";
 import Select from "@/components/ui/select";
+import Skeleton from "@/components/ui/skeleton";
 import Textarea from "@/components/ui/textarea";
 import StatusBadge from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
+import DataView from "@/components/workspace/data-view";
+import { ErrorState, InlineError } from "@/components/workspace/error-state";
+import { FilterChips } from "@/components/workspace/filter-chips";
+import PageHeader from "@/components/workspace/page-header";
+import PageToolbar from "@/components/workspace/page-toolbar";
+import { compareBy, useTableSort } from "@/hooks/use-table-sort";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { formatBytes, formatDate, pluralise } from "@/lib/format";
 import { toStatusOptions } from "@/lib/domain/status";
@@ -34,10 +41,7 @@ import { phasesService, type ProjectPhase } from "@/services/phases.service";
 const STATUS_OPTIONS = toStatusOptions(DELIVERABLE_STATUS_ORDER);
 
 /** Statuses that mean the deliverable has landed with the client. */
-const SETTLED_STATUSES: DeliverableStatus[] = [
-  "APPROVED",
-  "FINALIZED",
-];
+const SETTLED_STATUSES: DeliverableStatus[] = ["APPROVED", "FINALIZED"];
 
 const emptyForm = {
   projectId: "",
@@ -63,6 +67,10 @@ const DeliverablesPage = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<DeliverableStatus | "all">(
+    "all",
+  );
+  const [projectFilter, setProjectFilter] = useState<string>("all");
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -79,8 +87,9 @@ const DeliverablesPage = () => {
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const [archiveTarget, setArchiveTarget] = useState<Deliverable | null>(null);
-  const [removeFileTarget, setRemoveFileTarget] =
-    useState<FileRecord | null>(null);
+  const [removeFileTarget, setRemoveFileTarget] = useState<FileRecord | null>(
+    null,
+  );
 
   const [now, setNow] = useState(0);
 
@@ -185,7 +194,8 @@ const DeliverablesPage = () => {
       status: state.status,
     };
 
-    if (state.description.trim()) payload.description = state.description.trim();
+    if (state.description.trim())
+      payload.description = state.description.trim();
     if (state.taskId) payload.taskId = state.taskId;
     if (state.phaseId) payload.phaseId = state.phaseId;
     if (state.dueDate) payload.dueDate = new Date(state.dueDate).toISOString();
@@ -287,7 +297,9 @@ const DeliverablesPage = () => {
     );
 
     try {
-      const updated = await deliverablesService.update(deliverable.id, { status });
+      const updated = await deliverablesService.update(deliverable.id, {
+        status,
+      });
 
       setDeliverables((prev) =>
         prev.map((item) => (item.id === deliverable.id ? updated : item)),
@@ -369,7 +381,9 @@ const DeliverablesPage = () => {
     try {
       await deliverablesService.archive(deliverable.id);
 
-      setDeliverables((prev) => prev.filter((item) => item.id !== deliverable.id));
+      setDeliverables((prev) =>
+        prev.filter((item) => item.id !== deliverable.id),
+      );
       setArchiveTarget(null);
       toast({
         tone: "success",
@@ -397,268 +411,353 @@ const DeliverablesPage = () => {
    */
   const needle = query.trim().toLowerCase();
 
-  const visible = needle
-    ? deliverables.filter((deliverable) =>
-        [
-          deliverable.name,
-          deliverable.description,
-          projectName(deliverable.projectId),
-          phaseName(deliverable.phaseId),
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(needle),
-      )
-    : deliverables;
+  const visible = deliverables.filter((deliverable) => {
+    if (statusFilter !== "all" && deliverable.status !== statusFilter)
+      return false;
+    if (projectFilter !== "all" && deliverable.projectId !== projectFilter)
+      return false;
+    if (!needle) return true;
+
+    return [
+      deliverable.name,
+      deliverable.description,
+      projectName(deliverable.projectId),
+      phaseName(deliverable.phaseId),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(needle);
+  });
+
+  /*
+   * Due date and name are the two columns a user sorts by. The comparator reads
+   * the lookup tables directly so its dependencies are the data it uses, and a
+   * missing due date always sorts last — a deliverable without a date is not the
+   * most urgent thing on the list.
+   */
+  const compareDeliverables = useCallback(
+    (key: string | null, a: Deliverable, b: Deliverable) => {
+      if (key === "project") {
+        return compareBy<Deliverable>(
+          (deliverable) =>
+            projects.find((project) => project.id === deliverable.projectId)
+              ?.name,
+        )(a, b);
+      }
+
+      if (key === "phase") {
+        return compareBy<Deliverable>(
+          (deliverable) =>
+            phases.find((phase) => phase.id === deliverable.phaseId)?.name,
+        )(a, b);
+      }
+
+      if (key === "version") return a.version - b.version;
+
+      if (key === "name") return compareBy<Deliverable>((d) => d.name)(a, b);
+
+      return compareBy<Deliverable>((d) => d.dueDate)(a, b);
+    },
+    [projects, phases],
+  );
+
+  const { sort, onSortChange, sorted } = useTableSort(
+    visible,
+    compareDeliverables,
+  );
 
   const canCreate = projects.length > 0;
 
   return (
     <>
       <div className="mx-auto w-full max-w-[1400px] px-6 py-8 lg:px-10">
-        <header className="motion-enter flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="font-display text-[28px] font-light text-ink">
-              Deliverables
-            </h1>
-            <p className="mt-2 max-w-2xl text-pretty text-[14px] leading-relaxed text-ink-muted">
-              Drawings, reports and issued documents, and where each one stands
-              with the client.
-            </p>
-          </div>
-
-          {canCreate && (
-            <Button variant="primary" onClick={openCreate}>
-              <Plus className="size-4" aria-hidden="true" />
-              New deliverable
-            </Button>
-          )}
-        </header>
+        <PageHeader
+          title="Deliverables"
+          description="Drawings, reports and issued documents, and where each one stands with the client."
+          actions={
+            canCreate ? (
+              <Button onClick={openCreate}>
+                <Plus className="size-4" aria-hidden="true" />
+                New deliverable
+              </Button>
+            ) : undefined
+          }
+        />
 
         {actionError && (
-          <p
-            role="alert"
-            className="mt-4 rounded-sm border border-danger/30 bg-danger/10 px-3 py-2 text-[13px] text-danger"
-          >
-            {actionError}
-          </p>
+          <InlineError
+            title="Action failed"
+            detail={actionError}
+            className="mt-5"
+          />
         )}
 
-        {!loading && deliverables.length > 0 && (
-          <div className="mt-6 max-w-sm motion-enter">
-            <SearchField
-              label="Search deliverables"
-              placeholder="Search by name, project or phase"
-              value={query}
-              onChange={setQuery}
+        {loading ? (
+          <DeliverablesSkeleton />
+        ) : loadError && deliverables.length === 0 ? (
+          <ErrorState
+            title="Couldn't load deliverables"
+            description="We couldn't retrieve your issued documents right now."
+            detail={loadError}
+            onRetry={load}
+            className="border-t border-line"
+          />
+        ) : deliverables.length === 0 ? (
+          <div className="mt-6">
+            <EmptyState
+              icon={<FileCheck2 className="size-4" aria-hidden="true" />}
+              title="No deliverables yet"
+              description={
+                canCreate
+                  ? "Create a deliverable to start tracking issued documents."
+                  : "Create a project first — every deliverable belongs to one."
+              }
+              action={
+                canCreate ? (
+                  <Button onClick={openCreate}>
+                    <Plus className="size-4" aria-hidden="true" />
+                    New deliverable
+                  </Button>
+                ) : (
+                  <Link
+                    href="/projects"
+                    className="inline-flex items-center rounded-sm border border-line px-3 py-2 text-[13px] text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                  >
+                    Go to projects
+                  </Link>
+                )
+              }
             />
           </div>
-        )}
+        ) : (
+          <>
+            <PageToolbar
+              className="mt-6"
+              count={
+                needle || statusFilter !== "all" || projectFilter !== "all"
+                  ? `${sorted.length} of ${deliverables.length}`
+                  : pluralise(deliverables.length, "deliverable")
+              }
+              filters={
+                <>
+                  <FilterChips
+                    label="Filter by status"
+                    allLabel="All statuses"
+                    options={STATUS_OPTIONS.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                      count: deliverables.filter(
+                        (deliverable) => deliverable.status === option.value,
+                      ).length,
+                    }))}
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                  />
 
-        <Card className="mt-6 motion-enter">
-          <CardHeader
-            title="All deliverables"
-            description={
-              loading
-                ? "Loading…"
-                : `${pluralise(visible.length, "deliverable")}${
-                    needle && visible.length !== deliverables.length
-                      ? ` of ${deliverables.length}`
-                      : ""
-                  }`
-            }
-          />
+                  <FilterChips
+                    label="Filter by project"
+                    allLabel="All projects"
+                    options={projects.map((project) => ({
+                      value: project.id,
+                      label: project.name,
+                      count: deliverables.filter(
+                        (deliverable) => deliverable.projectId === project.id,
+                      ).length,
+                    }))}
+                    value={projectFilter}
+                    onChange={setProjectFilter}
+                  />
+                </>
+              }
+            >
+              <SearchField
+                label="Search deliverables"
+                placeholder="Name, project or phase"
+                value={query}
+                onChange={setQuery}
+              />
+            </PageToolbar>
 
-          <CardBody>
-            {loading ? (
-              <div
-                role="status"
-                className="py-8 text-center text-[14px] text-ink-subtle"
-              >
-                Loading…
-              </div>
-            ) : loadError && deliverables.length === 0 ? (
-              <EmptyState
-                title="Could not load deliverables"
-                description={loadError}
-                tone="error"
-                size="sm"
-                action={
-                  <Button variant="secondary" onClick={load}>
-                    Try again
-                  </Button>
-                }
-              />
-            ) : deliverables.length === 0 ? (
-              <EmptyState
-                icon={<FileCheck2 className="size-4" aria-hidden="true" />}
-                title="No deliverables yet"
-                description={
-                  canCreate
-                    ? "Create a deliverable to start tracking issued documents."
-                    : "Create a project first — every deliverable belongs to one."
-                }
-                size="sm"
-                action={
-                  canCreate ? (
-                    <Button variant="primary" onClick={openCreate} size="sm">
-                      <Plus className="size-4" aria-hidden="true" />
-                      New deliverable
-                    </Button>
-                  ) : undefined
-                }
-              />
-            ) : needle && visible.length === 0 ? (
-              <EmptyState
-                title="No matching deliverables"
-                description={`Nothing matches “${query.trim()}”.`}
-                size="sm"
-                action={
-                  <Button variant="secondary" onClick={() => setQuery("")}>
-                    Clear search
-                  </Button>
-                }
-              />
-            ) : (
-              <ul className="space-y-3">
-                {visible.map((deliverable) => {
-                  const project = projectName(deliverable.projectId);
-                  const phase = phaseName(deliverable.phaseId);
-                  const attached = attachedFiles(deliverable.id);
-                  const due = formatDate(deliverable.dueDate);
-                  const overdue = isOverdue(deliverable);
-
-                  return (
-                    <li
-                      key={deliverable.id}
-                      className="rounded-sm border border-line p-3"
+            <div className="mt-6">
+              {sorted.length === 0 ? (
+                <EmptyState
+                  title="Nothing matches"
+                  description="No deliverable matches the current search and filters."
+                  size="sm"
+                  action={
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setQuery("");
+                        setStatusFilter("all");
+                        setProjectFilter("all");
+                      }}
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-[14px] font-medium text-ink">
-                              {deliverable.name}
-                            </span>
+                      Clear search and filters
+                    </Button>
+                  }
+                />
+              ) : (
+                <DataView<Deliverable>
+                  label="Deliverables"
+                  rows={sorted}
+                  rowKey={(deliverable) => deliverable.id}
+                  sort={sort}
+                  onSortChange={onSortChange}
+                  primary={(deliverable) => deliverable.name}
+                  secondary={(deliverable) =>
+                    [
+                      projectName(deliverable.projectId),
+                      phaseName(deliverable.phaseId),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "No project or phase"
+                  }
+                  meta={(deliverable) => (
+                    <>
+                      <StatusBadge status={deliverable.status} />
 
-                            <StatusBadge status={deliverable.status} />
+                      {/* Version is server-assigned and only ever moves forward,
+                          so it is read-only everywhere. */}
+                      <Badge tone="neutral" dot={false}>
+                        v{deliverable.version}
+                      </Badge>
 
-                            {/* Version is server-assigned and only ever moves
-                                forward, so it is read-only here. */}
-                            <Badge tone="neutral" dot={false}>
-                              v{deliverable.version}
-                            </Badge>
-                          </div>
-
-                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-subtle">
-                            {project && <span>{project}</span>}
-                            {phase && <span>{phase}</span>}
-
-                            {due && (
-                              <span className={overdue ? "text-danger" : undefined}>
-                                {overdue ? "Overdue · " : "Due "}
-                                {due}
-                              </span>
-                            )}
-
-                            {attached.length > 0 && (
-                              <span className="tabular-nums">
-                                {pluralise(attached.length, "file")}
-                              </span>
-                            )}
-                          </div>
-
-                          {deliverable.description && (
-                            <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
-                              {deliverable.description}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="flex shrink-0 flex-wrap items-center gap-2">
-                          <Select
-                            aria-label={`Status for ${deliverable.name}`}
-                            options={STATUS_OPTIONS}
-                            value={deliverable.status}
-                            size="sm"
-                            fullWidth={false}
-                            onChange={(value) =>
-                              advanceStatus(
-                                deliverable,
-                                value as DeliverableStatus,
-                              )
-                            }
-                            className="w-[190px]"
-                          />
-
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => {
-                              setUploadError(null);
-                              setUploadTarget(deliverable);
-                            }}
-                          >
-                            <Upload className="size-4" aria-hidden="true" />
-                            File
-                          </Button>
-
-                          <Button
-                            size="sm"
-                            variant="tertiary"
-                            onClick={() => openEdit(deliverable)}
-                            aria-label={`Edit ${deliverable.name}`}
-                          >
-                            <Pencil className="size-4" aria-hidden="true" />
-                          </Button>
-
-                          <Button
-                            size="sm"
-                            variant="tertiary"
-                            onClick={() => setArchiveTarget(deliverable)}
-                            aria-label={`Archive ${deliverable.name}`}
-                          >
-                            <Archive className="size-4" aria-hidden="true" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {attached.length > 0 && (
-                        <ul className="mt-3 space-y-1 border-t border-line pt-3">
-                          {attached.map((file) => (
-                            <li
-                              key={file.id}
-                              className="flex items-center justify-between gap-3 text-[13px]"
-                            >
-                              <span className="min-w-0 truncate text-ink">
-                                {file.originalName}
-                              </span>
-
-                              <span className="flex shrink-0 items-center gap-3">
-                                <span className="text-ink-subtle tabular-nums">
-                                  {formatBytes(file.size)}
-                                </span>
-
-                                <Button
-                                  size="sm"
-                                  variant="tertiary"
-                                  onClick={() => setRemoveFileTarget(file)}
-                                  aria-label={`Remove ${file.originalName}`}
-                                >
-                                  <X className="size-4" aria-hidden="true" />
-                                </Button>
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
+                      {deliverable.dueDate && (
+                        <span
+                          className={[
+                            "text-[12px] tabular-nums",
+                            isOverdue(deliverable)
+                              ? "text-danger"
+                              : "text-ink-subtle",
+                          ].join(" ")}
+                        >
+                          {isOverdue(deliverable) ? "Overdue · " : "Due "}
+                          {formatDate(deliverable.dueDate)}
+                        </span>
                       )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </CardBody>
-        </Card>
+                    </>
+                  )}
+                  actions={(deliverable) => (
+                    <>
+                      <Select
+                        aria-label={`Status for ${deliverable.name}`}
+                        options={STATUS_OPTIONS}
+                        value={deliverable.status}
+                        size="sm"
+                        fullWidth={false}
+                        onChange={(value) =>
+                          advanceStatus(deliverable, value as DeliverableStatus)
+                        }
+                        className="w-[150px]"
+                      />
+
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setUploadError(null);
+                          setUploadTarget(deliverable);
+                        }}
+                      >
+                        <Upload className="size-4" aria-hidden="true" />
+                        Files
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="tertiary"
+                        onClick={() => openEdit(deliverable)}
+                        aria-label={`Edit ${deliverable.name}`}
+                      >
+                        <Pencil className="size-4" aria-hidden="true" />
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="tertiary"
+                        onClick={() => setArchiveTarget(deliverable)}
+                        aria-label={`Archive ${deliverable.name}`}
+                      >
+                        <Archive className="size-4" aria-hidden="true" />
+                      </Button>
+                    </>
+                  )}
+                  columns={[
+                    {
+                      key: "name",
+                      header: "Deliverable",
+                      sortable: true,
+                      cell: (deliverable) => deliverable.name,
+                    },
+                    {
+                      key: "status",
+                      header: "Status",
+                      width: "w-32",
+                      cell: (deliverable) => (
+                        <StatusBadge status={deliverable.status} />
+                      ),
+                    },
+                    {
+                      key: "version",
+                      header: "Version",
+                      width: "w-20",
+                      numeric: true,
+                      sortable: true,
+                      cell: (deliverable) => `v${deliverable.version}`,
+                    },
+                    {
+                      key: "project",
+                      header: "Project",
+                      sortable: true,
+                      hideBelowLg: true,
+                      cell: (deliverable) =>
+                        projectName(deliverable.projectId) ?? "—",
+                    },
+                    {
+                      key: "phase",
+                      header: "Phase",
+                      sortable: true,
+                      hideBelowLg: true,
+                      cell: (deliverable) =>
+                        phaseName(deliverable.phaseId) ?? "—",
+                    },
+                    {
+                      key: "files",
+                      header: "Files",
+                      align: "right",
+                      numeric: true,
+                      width: "w-20",
+                      hideBelowMd: true,
+                      cell: (deliverable) =>
+                        attachedFiles(deliverable.id).length,
+                    },
+                    {
+                      key: "due",
+                      header: "Due",
+                      numeric: true,
+                      sortable: true,
+                      width: "w-36",
+                      cell: (deliverable) =>
+                        deliverable.dueDate ? (
+                          <span
+                            className={
+                              isOverdue(deliverable) ? "text-danger" : undefined
+                            }
+                          >
+                            {formatDate(deliverable.dueDate)}
+                          </span>
+                        ) : (
+                          <span className="text-ink-subtle">—</span>
+                        ),
+                    },
+                  ]}
+                />
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       <Dialog
@@ -687,9 +786,7 @@ const DeliverablesPage = () => {
               variant="primary"
               loading={submitting}
               disabled={
-                submitting ||
-                !form.name.trim() ||
-                (!editing && !form.projectId)
+                submitting || !form.name.trim() || (!editing && !form.projectId)
               }
             >
               {editing ? "Save changes" : "Create deliverable"}
@@ -735,9 +832,7 @@ const DeliverablesPage = () => {
             name="name"
             label="Name"
             value={form.name}
-            onChange={(event) =>
-              setForm({ ...form, name: event.target.value })
-            }
+            onChange={(event) => setForm({ ...form, name: event.target.value })}
             data-autofocus={editing ? true : undefined}
             required
           />
@@ -777,7 +872,9 @@ const DeliverablesPage = () => {
               id="deliverable-phase"
               label="Phase"
               placeholder="None"
-              description={phases.length === 0 ? "No phases set up yet." : undefined}
+              description={
+                phases.length === 0 ? "No phases set up yet." : undefined
+              }
               options={phases.map((phase) => ({
                 value: phase.id,
                 label: phase.name,
@@ -817,7 +914,9 @@ const DeliverablesPage = () => {
           setUploadTarget(null);
         }}
         label="Attach a file"
-        title={uploadTarget ? `Attach to ${uploadTarget.name}` : "Attach a file"}
+        title={
+          uploadTarget ? `Attach to ${uploadTarget.name}` : "Attach a file"
+        }
         footer={
           <>
             <Button
@@ -857,6 +956,43 @@ const DeliverablesPage = () => {
           }}
           className="space-y-4"
         >
+          {/* The row shows a file count; this is where the files themselves are
+              listed, so a deliverable still has exactly one place to review and
+              change what has been issued against it. */}
+          {uploadTarget && attachedFiles(uploadTarget.id).length > 0 && (
+            <div>
+              <p className="text-[13px] text-ink-subtle">Already attached</p>
+
+              <ul className="mt-2 divide-y divide-line border-y border-line">
+                {attachedFiles(uploadTarget.id).map((file) => (
+                  <li
+                    key={file.id}
+                    className="flex items-center justify-between gap-3 py-2"
+                  >
+                    <span className="min-w-0 truncate text-[13px] text-ink">
+                      {file.originalName}
+                    </span>
+
+                    <span className="flex shrink-0 items-center gap-3">
+                      <span className="text-[12px] text-ink-subtle tabular-nums">
+                        {formatBytes(file.size)}
+                      </span>
+
+                      <Button
+                        size="sm"
+                        variant="tertiary"
+                        onClick={() => setRemoveFileTarget(file)}
+                        aria-label={`Remove ${file.originalName}`}
+                      >
+                        <X className="size-4" aria-hidden="true" />
+                      </Button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div>
             <label
               className="mb-1 block text-sm text-ink"
@@ -911,23 +1047,20 @@ const DeliverablesPage = () => {
       >
         <div className="space-y-3 text-[13px] leading-relaxed text-ink-muted">
           <p>
-            <span className="font-medium text-ink">
-              {archiveTarget?.name}
-            </span>{" "}
+            <span className="font-medium text-ink">{archiveTarget?.name}</span>{" "}
             will be removed from this list. Archiving keeps the deliverable, its
             version history and its files, so it can be restored later.
           </p>
 
-          {archiveTarget &&
-            attachedFiles(archiveTarget.id).length > 0 && (
-              <p>
-                {pluralise(
-                  attachedFiles(archiveTarget.id).length,
-                  "attached file",
-                )}{" "}
-                will stay attached to it.
-              </p>
-            )}
+          {archiveTarget && attachedFiles(archiveTarget.id).length > 0 && (
+            <p>
+              {pluralise(
+                attachedFiles(archiveTarget.id).length,
+                "attached file",
+              )}{" "}
+              will stay attached to it.
+            </p>
+          )}
         </div>
       </Dialog>
 
@@ -967,5 +1100,18 @@ const DeliverablesPage = () => {
     </>
   );
 };
+
+/**
+ * Mirrors the settled page — toolbar rule, then a table — so the transition
+ * does not reflow.
+ */
+const DeliverablesSkeleton = () => (
+  <div className="mt-6" aria-busy="true">
+    <span className="sr-only">Loading deliverables…</span>
+
+    <Skeleton className="h-14 w-full" />
+    <Skeleton className="mt-6 h-72 w-full" />
+  </div>
+);
 
 export default DeliverablesPage;

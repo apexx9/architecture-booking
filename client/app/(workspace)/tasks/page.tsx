@@ -1,20 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Archive, ListChecks, Pencil, Plus } from "lucide-react";
 
 import Button from "@/components/ui/button";
-import Card, { CardBody, CardHeader } from "@/components/ui/card";
 import DateInput from "@/components/ui/date-input";
 import Dialog from "@/components/ui/dialog";
 import EmptyState from "@/components/ui/empty-state";
 import Input from "@/components/ui/input";
 import SearchField from "@/components/ui/search-field";
+import Skeleton from "@/components/ui/skeleton";
 import Select from "@/components/ui/select";
 import Textarea from "@/components/ui/textarea";
 import StatusBadge from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
 import { getApiErrorMessage } from "@/lib/api/errors";
+import DataView from "@/components/workspace/data-view";
+import { ErrorState, InlineError } from "@/components/workspace/error-state";
+import { FilterChips } from "@/components/workspace/filter-chips";
+import PageHeader from "@/components/workspace/page-header";
+import PageToolbar from "@/components/workspace/page-toolbar";
+import { compareBy, useTableSort } from "@/hooks/use-table-sort";
 import { formatDate, pluralise } from "@/lib/format";
 import { toPriorityOptions, toStatusOptions } from "@/lib/domain/status";
 import {
@@ -68,6 +75,8 @@ const TasksPage = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all");
+  const [projectFilter, setProjectFilter] = useState<string>("all");
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -190,7 +199,8 @@ const TasksPage = () => {
       priority: state.priority,
     };
 
-    if (state.description.trim()) payload.description = state.description.trim();
+    if (state.description.trim())
+      payload.description = state.description.trim();
     if (state.phaseId) payload.phaseId = state.phaseId;
     if (state.assigneeId) payload.assigneeId = state.assigneeId;
     if (state.dueDate) payload.dueDate = new Date(state.dueDate).toISOString();
@@ -323,7 +333,11 @@ const TasksPage = () => {
 
       setTasks((prev) => prev.filter((item) => item.id !== task.id));
       setArchiveTarget(null);
-      toast({ tone: "success", title: "Task archived", description: task.title });
+      toast({
+        tone: "success",
+        title: "Task archived",
+        description: task.title,
+      });
     } catch (error) {
       const description = getApiErrorMessage(error);
 
@@ -341,21 +355,59 @@ const TasksPage = () => {
    */
   const needle = query.trim().toLowerCase();
 
-  const visible = needle
-    ? tasks.filter((task) =>
-        [
-          task.title,
-          task.description,
-          projectName(task.projectId),
-          phaseName(task.phaseId),
-          assigneeName(task.assigneeId),
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(needle),
-      )
-    : tasks;
+  const visible = tasks.filter((task) => {
+    if (statusFilter !== "all" && task.status !== statusFilter) return false;
+    if (projectFilter !== "all" && task.projectId !== projectFilter)
+      return false;
+    if (!needle) return true;
+
+    return [
+      task.title,
+      task.description,
+      projectName(task.projectId),
+      phaseName(task.phaseId),
+      assigneeName(task.assigneeId),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(needle);
+  });
+
+  /*
+   * Due date is the column a user actually sorts by, and it is the one where
+   * "no date" has to stay out of the way: a task without a due date is not the
+   * most urgent thing on the list, so nullish values sort last either way.
+   *
+   * The comparator receives the active sort key, and reads the lookup tables
+   * directly rather than through `projectName`/`assigneeName`, so its
+   * dependencies are the data it actually uses rather than two closures that are
+   * rebuilt on every render.
+   */
+  const compareTasks = useCallback(
+    (key: string | null, a: Task, b: Task) => {
+      if (key === "title") return compareBy<Task>((task) => task.title)(a, b);
+
+      if (key === "project") {
+        return compareBy<Task>(
+          (task) =>
+            projects.find((project) => project.id === task.projectId)?.name,
+        )(a, b);
+      }
+
+      if (key === "assignee") {
+        return compareBy<Task>(
+          (task) =>
+            members.find((member) => member.userId === task.assigneeId)?.email,
+        )(a, b);
+      }
+
+      return compareBy<Task>((task) => task.dueDate)(a, b);
+    },
+    [projects, members],
+  );
+
+  const { sort, onSortChange, sorted } = useTableSort(visible, compareTasks);
 
   const canCreate = projects.length > 0;
 
@@ -372,154 +424,168 @@ const TasksPage = () => {
   return (
     <>
       <div className="mx-auto w-full max-w-[1400px] px-6 py-8 lg:px-10">
-        <header className="motion-enter flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="font-display text-[28px] font-light text-ink">
-              Tasks
-            </h1>
-            <p className="mt-2 max-w-2xl text-pretty text-[14px] leading-relaxed text-ink-muted">
-              Track work across your projects.
-            </p>
-          </div>
-
-          {canCreate && (
-            <Button variant="primary" onClick={openCreate}>
-              <Plus className="size-4" aria-hidden="true" />
-              New task
-            </Button>
-          )}
-        </header>
+        <PageHeader
+          title="Tasks"
+          description="Track work across your projects. Every task belongs to exactly one project."
+          actions={
+            canCreate ? (
+              <Button onClick={openCreate}>
+                <Plus className="size-4" aria-hidden="true" />
+                New task
+              </Button>
+            ) : undefined
+          }
+        />
 
         {actionError && (
-          <p
-            role="alert"
-            className="mt-4 rounded-sm border border-danger/30 bg-danger/10 px-3 py-2 text-[13px] text-danger"
-          >
-            {actionError}
-          </p>
+          <InlineError
+            title="Action failed"
+            detail={actionError}
+            className="mt-5"
+          />
         )}
 
-        {!loading && tasks.length > 0 && (
-          <div className="mt-6 max-w-sm motion-enter">
-            <SearchField
-              label="Search tasks"
-              placeholder="Search by title, project or assignee"
-              value={query}
-              onChange={setQuery}
+        {loading ? (
+          <TasksSkeleton />
+        ) : loadError && tasks.length === 0 ? (
+          <ErrorState
+            title="Couldn't load tasks"
+            description="We couldn't retrieve your tasks right now."
+            detail={loadError}
+            onRetry={load}
+            className="border-t border-line"
+          />
+        ) : tasks.length === 0 ? (
+          <div className="mt-6">
+            <EmptyState
+              icon={<ListChecks className="size-4" aria-hidden="true" />}
+              title="No tasks yet"
+              description={
+                canCreate
+                  ? "Tasks you create against a project will appear here."
+                  : "Create a project first — every task belongs to one."
+              }
+              action={
+                canCreate ? (
+                  <Button onClick={openCreate}>
+                    <Plus className="size-4" aria-hidden="true" />
+                    New task
+                  </Button>
+                ) : (
+                  <Link
+                    href="/projects"
+                    className="inline-flex items-center rounded-sm border border-line px-3 py-2 text-[13px] text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                  >
+                    Go to projects
+                  </Link>
+                )
+              }
             />
           </div>
-        )}
+        ) : (
+          <>
+            <PageToolbar
+              className="mt-6"
+              count={
+                needle || statusFilter !== "all" || projectFilter !== "all"
+                  ? `${sorted.length} of ${tasks.length}`
+                  : pluralise(tasks.length, "task")
+              }
+              filters={
+                <>
+                  <FilterChips
+                    label="Filter by status"
+                    allLabel="All statuses"
+                    options={TASK_STATUS_OPTIONS.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                      count: tasks.filter(
+                        (task) => task.status === option.value,
+                      ).length,
+                    }))}
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                  />
 
-        <Card className="mt-6 motion-enter">
-          <CardHeader
-            title="All tasks"
-            description={
-              loading
-                ? "Loading…"
-                : `${pluralise(visible.length, "task")}${
-                    needle && visible.length !== tasks.length
-                      ? ` of ${tasks.length}`
-                      : ""
-                  }`
-            }
-          />
+                  <FilterChips
+                    label="Filter by project"
+                    allLabel="All projects"
+                    options={projects.map((project) => ({
+                      value: project.id,
+                      label: project.name,
+                      count: tasks.filter(
+                        (task) => task.projectId === project.id,
+                      ).length,
+                    }))}
+                    value={projectFilter}
+                    onChange={setProjectFilter}
+                  />
+                </>
+              }
+            >
+              <SearchField
+                label="Search tasks"
+                placeholder="Title, project or assignee"
+                value={query}
+                onChange={setQuery}
+              />
+            </PageToolbar>
 
-          <CardBody>
-            {loading ? (
-              <div
-                role="status"
-                className="py-8 text-center text-[14px] text-ink-subtle"
-              >
-                Loading…
-              </div>
-            ) : loadError && tasks.length === 0 ? (
-              <EmptyState
-                title="Could not load tasks"
-                description={loadError}
-                tone="error"
-                size="sm"
-                action={
-                  <Button variant="secondary" onClick={load}>
-                    Try again
-                  </Button>
-                }
-              />
-            ) : tasks.length === 0 ? (
-              <EmptyState
-                icon={<ListChecks className="size-4" aria-hidden="true" />}
-                title="No tasks yet"
-                description={
-                  canCreate
-                    ? "Tasks you create against a project will appear here."
-                    : "Create a project first — every task belongs to one."
-                }
-                size="sm"
-                action={
-                  canCreate ? (
-                    <Button variant="primary" onClick={openCreate} size="sm">
-                      <Plus className="size-4" aria-hidden="true" />
-                      New task
-                    </Button>
-                  ) : undefined
-                }
-              />
-            ) : needle && visible.length === 0 ? (
-              <EmptyState
-                title="No matching tasks"
-                description={`Nothing matches “${query.trim()}”.`}
-                size="sm"
-                action={
-                  <Button variant="secondary" onClick={() => setQuery("")}>
-                    Clear search
-                  </Button>
-                }
-              />
-            ) : (
-              <ul className="space-y-2">
-                {visible.map((task) => {
-                  const isPending = pending?.id === task.id;
-                  const project = projectName(task.projectId);
-                  const phase = phaseName(task.phaseId);
-                  const assignee = assigneeName(task.assigneeId);
-                  const due = formatDate(task.dueDate);
-                  const overdue = isOverdue(task);
-
-                  return (
-                    <li
-                      key={task.id}
-                      className="flex flex-wrap items-start justify-between gap-3 rounded-sm border border-line p-3"
+            <div className="mt-6">
+              {sorted.length === 0 ? (
+                <EmptyState
+                  title="Nothing matches"
+                  description="No task matches the current search and filters."
+                  size="sm"
+                  action={
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setQuery("");
+                        setStatusFilter("all");
+                        setProjectFilter("all");
+                      }}
                     >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[14px] font-medium text-ink">
-                            {task.title}
-                          </span>
+                      Clear search and filters
+                    </Button>
+                  }
+                />
+              ) : (
+                <DataView<Task>
+                  label="Tasks"
+                  rows={sorted}
+                  rowKey={(task) => task.id}
+                  sort={sort}
+                  onSortChange={onSortChange}
+                  primary={(task) => task.title}
+                  secondary={(task) =>
+                    [projectName(task.projectId), phaseName(task.phaseId)]
+                      .filter(Boolean)
+                      .join(" · ") || "No project or phase"
+                  }
+                  meta={(task) => (
+                    <>
+                      <StatusBadge status={task.status} />
+                      <StatusBadge status={task.priority} />
 
-                          <StatusBadge status={task.status} />
-                          <StatusBadge status={task.priority} />
-                        </div>
+                      {task.dueDate && (
+                        <span
+                          className={[
+                            "text-[12px] tabular-nums",
+                            isOverdue(task) ? "text-danger" : "text-ink-subtle",
+                          ].join(" ")}
+                        >
+                          {isOverdue(task) ? "Overdue · " : "Due "}
+                          {formatDate(task.dueDate)}
+                        </span>
+                      )}
+                    </>
+                  )}
+                  actions={(task) => {
+                    const isPending = pending?.id === task.id;
 
-                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-subtle">
-                          {project && <span>{project}</span>}
-                          {phase && <span>{phase}</span>}
-                          {assignee && <span>{assignee}</span>}
-
-                          {due && (
-                            <span className={overdue ? "text-danger" : undefined}>
-                              {overdue ? "Overdue · " : "Due "}
-                              {due}
-                            </span>
-                          )}
-
-                          {task.description && (
-                            <span className="line-clamp-1">
-                              {task.description}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    return (
+                      <>
                         <Select
                           aria-label={`Status for ${task.title}`}
                           options={TASK_STATUS_OPTIONS}
@@ -530,7 +596,7 @@ const TasksPage = () => {
                           onChange={(value) =>
                             advance(task, { status: value as TaskStatus })
                           }
-                          className="w-[140px]"
+                          className="w-[132px]"
                         />
 
                         {CLOSED_STATUSES.includes(task.status) && (
@@ -538,7 +604,9 @@ const TasksPage = () => {
                             size="sm"
                             variant="tertiary"
                             disabled={isPending}
-                            onClick={() => advance(task, { status: "IN_PROGRESS" })}
+                            onClick={() =>
+                              advance(task, { status: "IN_PROGRESS" })
+                            }
                           >
                             Reopen
                           </Button>
@@ -563,14 +631,75 @@ const TasksPage = () => {
                         >
                           <Archive className="size-4" aria-hidden="true" />
                         </Button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </CardBody>
-        </Card>
+                      </>
+                    );
+                  }}
+                  columns={[
+                    {
+                      key: "title",
+                      header: "Task",
+                      sortable: true,
+                      cell: (task) => task.title,
+                    },
+                    {
+                      key: "project",
+                      header: "Project",
+                      sortable: true,
+                      hideBelowLg: true,
+                      cell: (task) => projectName(task.projectId) ?? "—",
+                    },
+                    {
+                      key: "phase",
+                      header: "Phase",
+                      hideBelowLg: true,
+                      cell: (task) => phaseName(task.phaseId) ?? "—",
+                    },
+                    {
+                      key: "assignee",
+                      header: "Assignee",
+                      sortable: true,
+                      hideBelowMd: true,
+                      cell: (task) =>
+                        assigneeName(task.assigneeId) ?? "Unassigned",
+                    },
+                    {
+                      key: "status",
+                      header: "Status",
+                      width: "w-28",
+                      cell: (task) => <StatusBadge status={task.status} />,
+                    },
+                    {
+                      key: "priority",
+                      header: "Priority",
+                      width: "w-28",
+                      hideBelowMd: true,
+                      cell: (task) => <StatusBadge status={task.priority} />,
+                    },
+                    {
+                      key: "due",
+                      header: "Due",
+                      numeric: true,
+                      sortable: true,
+                      width: "w-36",
+                      cell: (task) =>
+                        task.dueDate ? (
+                          <span
+                            className={
+                              isOverdue(task) ? "text-danger" : undefined
+                            }
+                          >
+                            {formatDate(task.dueDate)}
+                          </span>
+                        ) : (
+                          <span className="text-ink-subtle">—</span>
+                        ),
+                    },
+                  ]}
+                />
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       <Dialog
@@ -599,7 +728,9 @@ const TasksPage = () => {
               variant="primary"
               loading={submitting}
               disabled={
-                submitting || !form.title.trim() || (!editing && !form.projectId)
+                submitting ||
+                !form.title.trim() ||
+                (!editing && !form.projectId)
               }
             >
               {editing ? "Save changes" : "Create task"}
@@ -607,7 +738,12 @@ const TasksPage = () => {
           </>
         }
       >
-        <form id="task-form" onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <form
+          id="task-form"
+          onSubmit={handleSubmit}
+          className="space-y-4"
+          noValidate
+        >
           {/*
             A task cannot change project, so the picker is hidden while editing
             rather than disabled — a permanently greyed-out field reads as a
@@ -752,5 +888,18 @@ const TasksPage = () => {
     </>
   );
 };
+
+/**
+ * Mirrors the settled page — toolbar rule, then a table — so the transition
+ * does not reflow.
+ */
+const TasksSkeleton = () => (
+  <div className="mt-6" aria-busy="true">
+    <span className="sr-only">Loading tasks…</span>
+
+    <Skeleton className="h-14 w-full" />
+    <Skeleton className="mt-6 h-72 w-full" />
+  </div>
+);
 
 export default TasksPage;

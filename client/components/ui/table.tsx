@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { MouseEventHandler, ReactNode } from "react";
 
 /**
  * Table primitives.
@@ -85,6 +85,15 @@ export interface TableRowProps {
   interactive?: boolean;
   selected?: boolean;
   className?: string;
+  /**
+   * Makes the row act on click.
+   *
+   * The row itself stays out of the tab order: a `<tr>` that navigates should
+   * still expose a real link inside it, because that link is what carries an
+   * accessible name, a middle-click, and "open in new tab". Callers are
+   * responsible for ignoring clicks that land on a control inside the row.
+   */
+  onClick?: MouseEventHandler<HTMLTableRowElement>;
 }
 
 export function TableRow({
@@ -92,9 +101,11 @@ export function TableRow({
   interactive = false,
   selected = false,
   className,
+  onClick,
 }: TableRowProps) {
   return (
     <tr
+      onClick={onClick}
       aria-selected={selected || undefined}
       className={[
         "border-b border-line-muted last:border-b-0",
@@ -114,6 +125,8 @@ export interface TableHeadProps {
   align?: Alignment;
   /** Width hint, e.g. `"w-32"`. Use when columns would otherwise jump. */
   width?: string;
+  /** Applies tabular numerals, to match a numeric `TableCell` below it. */
+  numeric?: boolean;
   className?: string;
 }
 
@@ -121,6 +134,7 @@ export function TableHead({
   children,
   align = "left",
   width,
+  numeric = false,
   className,
 }: TableHeadProps) {
   return (
@@ -130,6 +144,7 @@ export function TableHead({
         "px-4 py-2.5",
         "text-[12px] font-medium text-ink-muted whitespace-nowrap",
         ALIGN_STYLES[align],
+        numeric ? "tabular-nums" : "",
         width ?? "",
         className ?? "",
       ].join(" ")}
@@ -147,6 +162,8 @@ export interface TableCellProps {
    * quantities, dates, counts or money.
    */
   numeric?: boolean;
+  /** Width hint, e.g. `"w-40"`. Use when a column would otherwise jump. */
+  width?: string;
   className?: string;
 }
 
@@ -154,6 +171,7 @@ export function TableCell({
   children,
   align = "left",
   numeric = false,
+  width,
   className,
 }: TableCellProps) {
   return (
@@ -162,6 +180,7 @@ export function TableCell({
         "px-4 py-3 align-middle",
         ALIGN_STYLES[align],
         numeric ? "tabular-nums" : "",
+        width ?? "",
         className ?? "",
       ].join(" ")}
     >

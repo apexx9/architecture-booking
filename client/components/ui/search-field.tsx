@@ -8,6 +8,7 @@ interface SearchFieldProps {
   /** Accessible name. Say what is being searched, e.g. "Search projects". */
   label: string;
   placeholder?: string;
+  className?: string;
 }
 
 /**
@@ -25,11 +26,12 @@ const SearchField = ({
   onChange,
   label,
   placeholder = "Search",
+  className,
 }: SearchFieldProps) => {
   const id = `search-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 
   return (
-    <div className="relative">
+    <div className={["relative", className ?? ""].join(" ")}>
       <label htmlFor={id} className="sr-only">
         {label}
       </label>

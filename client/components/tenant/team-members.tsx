@@ -5,11 +5,14 @@ import { Trash2, UserPlus } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import Button from "@/components/ui/button";
-import Card, { CardBody, CardHeader } from "@/components/ui/card";
 import Dialog from "@/components/ui/dialog";
 import EmptyState from "@/components/ui/empty-state";
 import Input from "@/components/ui/input";
 import Select from "@/components/ui/select";
+import Skeleton from "@/components/ui/skeleton";
+import DataView from "@/components/workspace/data-view";
+import { ErrorState, InlineError } from "@/components/workspace/error-state";
+import { Section, SectionHeader } from "@/components/workspace/section";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { initials } from "@/lib/format";
 import {
@@ -52,7 +55,7 @@ const ROLE_OPTIONS = ASSIGNABLE_ROLES.map((role) => ({
  * Member listing itself only needs TENANT_MEMBERS_READ, which every role holds,
  * so a failure there is swallowed to keep the card usable for read-only roles.
  */
-export default function TeamCard() {
+export default function TeamMembers() {
   const [tenant, setTenant] = useState<CurrentTenant | null>(null);
   const [members, setMembers] = useState<TenantMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,6 +66,14 @@ export default function TeamCard() {
 
   /** Used only to mark the viewer's own row. */
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
+
+  /**
+   * OWNER cannot be edited, and neither can anything at all for a viewer without
+   * TENANT_MEMBERS_MANAGE — the server rejects both, so the controls are not
+   * rendered rather than rendered and failing.
+   */
+  const canEdit = (member: TenantMember) =>
+    member.role !== "OWNER" && canManage(tenant?.role);
 
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
@@ -143,7 +154,9 @@ export default function TeamCard() {
 
     try {
       await tenancyApi.removeMember(member.userId);
-      setMembers((prev) => prev.filter((item) => item.userId !== member.userId));
+      setMembers((prev) =>
+        prev.filter((item) => item.userId !== member.userId),
+      );
       setRemoving(null);
     } catch (error) {
       setActionError(getApiErrorMessage(error));
@@ -187,123 +200,162 @@ export default function TeamCard() {
   };
 
   return (
-    <Card className="motion-enter">
-      <CardHeader
-        title="Team"
-        description={`${members.length} member${members.length === 1 ? "" : "s"}`}
-        action={
-          canManage(tenant?.role) ? (
-            <Button size="sm" onClick={() => setOpen(true)}>
-              <UserPlus className="size-4" aria-hidden="true" />
-              Add Member
-            </Button>
-          ) : undefined
-        }
-      />
-      <CardBody>
-        {loading ? (
-          <div className="py-8 text-center text-[14px] text-ink-subtle">
-            Loading...
-          </div>
-        ) : loadError && members.length === 0 ? (
-          <EmptyState
-            title="Could not load the team"
-            description={loadError}
-            tone="error"
-            size="sm"
-          />
-        ) : members.length === 0 ? (
-          <EmptyState
-            title="No members"
-            description="Members of this practice will be listed here."
-            size="sm"
-          />
-        ) : (
-          <ul className="space-y-2">
-            {members.map((member) => {
-              const isBusy = busyId === member.userId;
-              // OWNER cannot be edited, and neither can anything at all for a
-              // viewer without TENANT_MEMBERS_MANAGE.
-              const editable =
-                member.role !== "OWNER" && canManage(tenant?.role);
-              const isViewer = member.userId === currentUserId;
+    <>
+      <Section className="motion-enter mt-6" divided>
+        <SectionHeader
+          title="Members"
+          description={`${members.length} ${
+            members.length === 1 ? "member" : "members"
+          } with access to this practice.`}
+          actions={
+            canManage(tenant?.role) ? (
+              <Button size="sm" onClick={() => setOpen(true)}>
+                <UserPlus className="size-4" aria-hidden="true" />
+                Add member
+              </Button>
+            ) : undefined
+          }
+        />
 
-              return (
-                <li
-                  key={member.userId}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-line p-3"
-                >
-                  <span className="flex min-w-0 flex-1 items-center gap-3">
-                    <span
-                      aria-hidden="true"
-                      className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-subtle text-[11px] text-ink-muted"
+        <div className="mt-5">
+          {loading ? (
+            <div className="space-y-2" aria-busy="true">
+              <span className="sr-only">Loading members…</span>
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+            </div>
+          ) : loadError && members.length === 0 ? (
+            <ErrorState
+              title="Couldn't load the team"
+              description="We couldn't retrieve who has access to this practice."
+              detail={loadError}
+              size="sm"
+            />
+          ) : (
+            <DataView<TenantMember>
+              label="Practice members"
+              rows={members}
+              rowKey={(member) => member.userId}
+              primary={(member) => memberName(member)}
+              secondary={(member) => member.email}
+              meta={(member) => (
+                <>
+                  {member.userId === currentUserId && (
+                    <span className="text-[12px] text-ink-subtle">You</span>
+                  )}
+
+                  {/* OWNER cannot be edited, and neither can anything at all
+                      for a viewer without TENANT_MEMBERS_MANAGE. */}
+                  {!canEdit(member) && (
+                    <Badge tone={member.role === "OWNER" ? "info" : "neutral"}>
+                      {label(member.role)}
+                    </Badge>
+                  )}
+                </>
+              )}
+              actions={(member) =>
+                canEdit(member) ? (
+                  <>
+                    <Select
+                      aria-label={`Role for ${memberName(member)}`}
+                      options={ROLE_OPTIONS}
+                      value={member.role}
+                      size="sm"
+                      fullWidth={false}
+                      disabled={busyId === member.userId}
+                      onChange={(value) =>
+                        changeRole(member, value as TenantRole)
+                      }
+                      className="w-[112px]"
+                    />
+
+                    <Button
+                      size="sm"
+                      variant="tertiary"
+                      disabled={busyId === member.userId}
+                      onClick={() => setRemoving(member)}
+                      aria-label={`Remove ${memberName(member)}`}
                     >
-                      {initials(memberName(member))}
-                    </span>
+                      <Trash2 className="size-4" aria-hidden="true" />
+                    </Button>
+                  </>
+                ) : null
+              }
+              empty={
+                <EmptyState
+                  title="No members"
+                  description="Nobody has access to this practice yet. Invite someone to start working in it."
+                  size="sm"
+                  action={
+                    canManage(tenant?.role) ? (
+                      <Button size="sm" onClick={() => setOpen(true)}>
+                        <UserPlus className="size-4" aria-hidden="true" />
+                        Add member
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              }
+              columns={[
+                {
+                  key: "member",
+                  header: "Member",
+                  cell: (member) => (
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span
+                        aria-hidden="true"
+                        className="flex size-7 shrink-0 items-center justify-center rounded-full bg-surface-subtle text-[11px] text-ink-muted"
+                      >
+                        {initials(memberName(member))}
+                      </span>
 
-                    <span className="min-w-0">
-                      <span className="flex flex-wrap items-center gap-x-2 text-[14px] text-ink">
-                        <span className="truncate">
-                          {memberName(member)}
+                      <span className="truncate">{memberName(member)}</span>
+
+                      {member.userId === currentUserId && (
+                        <span className="shrink-0 text-[12px] text-ink-subtle">
+                          You
                         </span>
-
-                        {isViewer && (
-                          <span className="text-[12px] text-ink-subtle">
-                            You
-                          </span>
-                        )}
-                      </span>
-
-                      <span className="block truncate text-[13px] text-ink-subtle">
-                        {member.email}
-                      </span>
+                      )}
                     </span>
-                  </span>
-
-                  <span className="flex shrink-0 items-center gap-2">
-                    {editable ? (
-                      <>
-                        <Select
-                          aria-label={`Role for ${memberName(member)}`}
-                          options={ROLE_OPTIONS}
-                          value={member.role}
-                          size="sm"
-                          fullWidth={false}
-                          disabled={isBusy}
-                          onChange={(value) =>
-                            changeRole(member, value as TenantRole)
-                          }
-                          className="w-[112px]"
-                        />
-
-                        <Button
-                          size="sm"
-                          variant="tertiary"
-                          disabled={isBusy}
-                          onClick={() => setRemoving(member)}
-                          aria-label={`Remove ${memberName(member)}`}
-                        >
-                          <Trash2 className="size-4" aria-hidden="true" />
-                        </Button>
-                      </>
+                  ),
+                },
+                {
+                  key: "email",
+                  header: "Email",
+                  hideBelowLg: true,
+                  cell: (member) => member.email,
+                },
+                {
+                  key: "role",
+                  header: "Role",
+                  width: "w-32",
+                  cell: (member) =>
+                    canEdit(member) ? (
+                      <span className="text-ink-muted">
+                        {label(member.role)}
+                      </span>
                     ) : (
-                      <Badge tone={member.role === "OWNER" ? "info" : "neutral"}>
+                      <Badge
+                        tone={member.role === "OWNER" ? "info" : "neutral"}
+                      >
                         {label(member.role)}
                       </Badge>
-                    )}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                    ),
+                },
+              ]}
+            />
+          )}
+        </div>
 
         {actionError && (
-          <p role="alert" className="mt-4 text-[13px] text-danger">
-            {actionError}
-          </p>
+          <InlineError
+            title="Action failed"
+            detail={actionError}
+            className="mt-4"
+          />
         )}
-      </CardBody>
+      </Section>
 
       <Dialog
         open={removing !== null}
@@ -342,12 +394,15 @@ export default function TeamCard() {
       <Dialog
         open={open}
         onClose={() => setOpen(false)}
-        label="Add Member"
-        title="Add Member"
+        label="Add member"
+        title="Add a team member"
       >
         <form onSubmit={add} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm text-ink" htmlFor="member-email">
+            <label
+              className="mb-1 block text-sm text-ink"
+              htmlFor="member-email"
+            >
               Email
             </label>
             <Input
@@ -392,11 +447,11 @@ export default function TeamCard() {
               loading={adding}
               disabled={adding || !email.trim()}
             >
-              Add Member
+              Add member
             </Button>
           </div>
         </form>
       </Dialog>
-    </Card>
+    </>
   );
 }

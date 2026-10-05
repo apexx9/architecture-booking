@@ -5,12 +5,13 @@ import { Archive, ListOrdered, Pencil, Plus } from "lucide-react";
 
 import Badge from "@/components/ui/badge";
 import Button from "@/components/ui/button";
-import Card, { CardBody, CardHeader } from "@/components/ui/card";
+
 import Dialog from "@/components/ui/dialog";
 import EmptyState from "@/components/ui/empty-state";
 import Input from "@/components/ui/input";
 import Textarea from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
+import { Section, SectionHeader } from "@/components/workspace/section";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { pluralise } from "@/lib/format";
 import {
@@ -123,7 +124,8 @@ export default function PhasesCard() {
   const createPayload = (state: FormState): CreateProjectPhaseInput => {
     const payload: CreateProjectPhaseInput = { name: state.name.trim() };
 
-    if (state.description.trim()) payload.description = state.description.trim();
+    if (state.description.trim())
+      payload.description = state.description.trim();
 
     const order = parseOrder(state.order);
 
@@ -209,7 +211,11 @@ export default function PhasesCard() {
 
       setPhases((prev) => prev.filter((item) => item.id !== phase.id));
       setArchiveTarget(null);
-      toast({ tone: "success", title: "Phase archived", description: phase.name });
+      toast({
+        tone: "success",
+        title: "Phase archived",
+        description: phase.name,
+      });
     } catch (error) {
       const description = getApiErrorMessage(error);
 
@@ -223,15 +229,15 @@ export default function PhasesCard() {
 
   return (
     <>
-      <Card className="motion-enter">
-        <CardHeader
+      <Section className="motion-enter">
+        <SectionHeader
           title="Phases"
           description={
             loading
               ? "Loading…"
               : `${pluralise(ordered.length, "phase")} in your practice`
           }
-          action={
+          actions={
             <Button size="sm" variant="secondary" onClick={openCreate}>
               <Plus className="size-4" aria-hidden="true" />
               New phase
@@ -239,7 +245,7 @@ export default function PhasesCard() {
           }
         />
 
-        <CardBody>
+        <div className="mt-5">
           {loading ? (
             <div
               role="status"
@@ -342,8 +348,8 @@ export default function PhasesCard() {
               {actionError}
             </p>
           )}
-        </CardBody>
-      </Card>
+        </div>
+      </Section>
 
       <Dialog
         open={open}
@@ -412,7 +418,9 @@ export default function PhasesCard() {
             min={1}
             hint="Lower numbers come first. There is no drag-to-reorder, so this is the control."
             value={form.order}
-            onChange={(event) => setForm({ ...form, order: event.target.value })}
+            onChange={(event) =>
+              setForm({ ...form, order: event.target.value })
+            }
           />
 
           {formError && (
