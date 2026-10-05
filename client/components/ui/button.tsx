@@ -31,9 +31,15 @@ const VARIANT_STYLES: Record<ButtonVariant, string> = {
     "bg-transparent text-danger border border-danger/35 hover:bg-danger/5 hover:border-danger active:bg-danger/10",
 };
 
+/*
+ * `sm` and `md` are one step taller on narrow viewports. 32px and 40px are
+ * fine for a mouse but cramped for a thumb, and the density these sizes exist
+ * to provide is a desktop concern — from `sm` up, where pointer input is
+ * likely, they go back to their intended heights.
+ */
 const SIZE_STYLES: Record<ButtonSize, string> = {
-  sm: "h-8 px-3 text-[13px] gap-1.5",
-  md: "h-10 px-4 text-[14px] gap-2",
+  sm: "h-9 px-3 text-[13px] gap-1.5 sm:h-8",
+  md: "h-11 px-4 text-[14px] gap-2 sm:h-10",
   lg: "h-12 px-6 text-[15px] gap-2",
 };
 

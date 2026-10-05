@@ -24,10 +24,21 @@ export type CurrentTenant = {
 
 export type TenantMember = {
   userId: string;
+  /**
+   * `GET /tenants/current/members` does not return a name today, so every
+   * member currently shows as an email. Declared optional so that when the
+   * endpoint starts sending one, existing consumers pick it up instead of
+   * needing a change — `memberName` below is the single place that decides.
+   */
+  fullName?: string | null;
   email: string;
   role: TenantRole;
   joinedAt: string;
 };
+
+/** The best available human label for a member. */
+export const memberName = (member: TenantMember): string =>
+  member.fullName?.trim() || member.email;
 
 export type SwitchTenantResponse = {
   tenant: {

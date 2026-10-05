@@ -9,6 +9,25 @@ export type LeadStatus =
   | "WON"
   | "LOST";
 
+/** Mirrors the server's `lead_source` pgEnum. */
+export type LeadSource =
+  | "WEBSITE"
+  | "REFERRAL"
+  | "DIRECT"
+  | "SOCIAL"
+  | "ADVERTISING"
+  | "EVENT"
+  | "OTHER";
+
+/** Mirrors the server's `project_type` pgEnum. */
+export type ProjectType =
+  | "RESIDENTIAL"
+  | "COMMERCIAL"
+  | "INTERIOR"
+  | "LANDSCAPE"
+  | "RENOVATION"
+  | "OTHER";
+
 export type Lead = {
   id: string;
   tenantId: string;
@@ -16,8 +35,8 @@ export type Lead = {
   email: string | null;
   phone: string | null;
   company: string | null;
-  source: string | null;
-  projectType: string | null;
+  source: LeadSource | null;
+  projectType: ProjectType | null;
   estimatedBudget: string | null;
   location: string | null;
   status: LeadStatus;
@@ -45,13 +64,60 @@ export type CreateLeadInput = {
   email?: string;
   phone?: string;
   company?: string;
-  source?: string;
-  projectType?: string;
+  source?: LeadSource;
+  projectType?: ProjectType;
   estimatedBudget?: string;
   location?: string;
   notes?: string;
   status?: LeadStatus;
 };
+
+/**
+ * Mirrors the server's `UpdateLeadDto`, with every field optional.
+ *
+ * `null` is accepted deliberately: the DTO validates with `@IsOptional()`, which
+ * skips `null`, and the columns are nullable. It is how a field is cleared — the
+ * server writes only the keys it receives, so omitting one leaves the stored
+ * value untouched.
+ *
+ * Note there is no `convertedToClientId` and no `isArchived`: promotion to a
+ * client is the dedicated convert endpoint's job, and the update DTO does not
+ * accept either field.
+ */
+export type UpdateLeadInput = {
+  [K in keyof CreateLeadInput]?: CreateLeadInput[K] | null;
+};
+
+/** Mirrors the server's `lead_source` pgEnum, in the order the UI offers them. */
+export const LEAD_SOURCES: LeadSource[] = [
+  "WEBSITE",
+  "REFERRAL",
+  "DIRECT",
+  "SOCIAL",
+  "ADVERTISING",
+  "EVENT",
+  "OTHER",
+];
+
+/** Mirrors the server's `project_type` pgEnum, in the order the UI offers them. */
+export const PROJECT_TYPES: ProjectType[] = [
+  "RESIDENTIAL",
+  "COMMERCIAL",
+  "INTERIOR",
+  "LANDSCAPE",
+  "RENOVATION",
+  "OTHER",
+];
+
+/** Statuses the UI offers, in the order a lead moves through them. */
+export const LEAD_STATUSES: LeadStatus[] = [
+  "NEW",
+  "CONTACTED",
+  "QUALIFIED",
+  "PROPOSAL",
+  "WON",
+  "LOST",
+];
 
 export const leadsService = {
   async getAll(): Promise<Lead[]> {
@@ -69,7 +135,7 @@ export const leadsService = {
     return response.data;
   },
 
-  async update(id: string, input: Partial<CreateLeadInput>): Promise<Lead> {
+  async update(id: string, input: UpdateLeadInput): Promise<Lead> {
     const response = await api.patch<Lead>(`/leads/${id}`, input);
     return response.data;
   },

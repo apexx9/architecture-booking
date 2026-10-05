@@ -1,179 +1,151 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FolderPlus, Plus } from "lucide-react";
+import Link from "next/link";
+import { Archive, FolderPlus, Pencil, Plus } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import Button from "@/components/ui/button";
 import Card, { CardBody, CardHeader } from "@/components/ui/card";
-import DateInput from "@/components/ui/date-input";
 import Dialog from "@/components/ui/dialog";
 import EmptyState from "@/components/ui/empty-state";
-import Input from "@/components/ui/input";
+import SearchField from "@/components/ui/search-field";
 import Select from "@/components/ui/select";
+import StatusBadge from "@/components/ui/status-badge";
+import { useToast } from "@/components/ui/toast";
+import ProjectFormDialog from "@/components/project/project-form-dialog";
 import { getApiErrorMessage } from "@/lib/api/errors";
+import { formatAmount, formatDateRange, pluralise } from "@/lib/format";
+import { toStatusOptions } from "@/lib/domain/status";
 import {
   PROJECT_STATUSES,
   projectsService,
-  type CreateProjectInput,
   type Project,
   type ProjectStatus,
 } from "@/services/projects.service";
 import { clientsService, type Client } from "@/services/clients.service";
+import { deliverablesService, type Deliverable } from "@/services/deliverables.service";
+import { tasksService, type Task } from "@/services/tasks.service";
 
-const STATUS_TONE = {
-  PLANNING: "neutral",
-  ACTIVE: "info",
-  ON_HOLD: "warning",
-  COMPLETED: "positive",
-  CANCELLED: "danger",
-} as const satisfies Record<ProjectStatus, "neutral" | "info" | "warning" | "positive" | "danger">;
-
-const humanise = (value: string) =>
-  value
-    .toLowerCase()
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-
-const PROJECT_STATUS_OPTIONS = PROJECT_STATUSES.map((status) => ({
-  value: status,
-  label: humanise(status),
-}));
-
-const emptyForm = {
-  name: "",
-  description: "",
-  clientId: "",
-  status: "PLANNING" as ProjectStatus,
-  startDate: "",
-  endDate: "",
-  budget: "",
-};
-
-type FormState = typeof emptyForm;
+const PROJECT_STATUS_OPTIONS = toStatusOptions(PROJECT_STATUSES);
 
 const ProjectsPage = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  /** Only used for counts in the archive confirmation. Failing to load them
+   *  degrades that confirmation rather than the page. */
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [query, setQuery] = useState("");
+
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<FormState>(emptyForm);
   const [editing, setEditing] = useState<Project | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [pending, setPending] = useState<{
+    id: string;
+    action: "status" | "archive";
+  } | null>(null);
+
+  const [archiveTarget, setArchiveTarget] = useState<Project | null>(null);
+
+  const { toast } = useToast();
+
+  const load = async () => {
+    setLoading(true);
+    setLoadError(null);
+
+    try {
+      // A project can reference a client, so the picker needs the client list.
+      // Its failure must not stop the project list from rendering.
+      const [projectData, clientData] = await Promise.all([
+        projectsService.list(),
+        clientsService.getAll().catch(() => [] as Client[]),
+      ]);
+
+      setProjects(projectData);
+      setClients(clientData);
+
+      // Counts only. These are deliberately fire-and-forget: the page is already
+      // usable, and a slow or failing counts request must not hold it back.
+      void tasksService
+        .list()
+        .then(setTasks)
+        .catch(() => undefined);
+      void deliverablesService
+        .list()
+        .then(setDeliverables)
+        .catch(() => undefined);
+    } catch (error) {
+      setLoadError(getApiErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
 
-    // A project can reference a client, so the picker needs the client list.
-    // Its failure must not stop the project list from rendering.
-    Promise.all([projectsService.list(), clientsService.getAll().catch(() => [])])
-      .then(([projectData, clientData]) => {
-        if (cancelled) {
-          return;
-        }
+    const run = async () => {
+      if (cancelled) return;
+      await load();
+    };
 
-        setProjects(projectData);
-        setClients(clientData);
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setLoadError(getApiErrorMessage(error));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
+    run();
 
     return () => {
       cancelled = true;
     };
   }, []);
 
+  const archiving = pending?.action === "archive";
+
   const clientName = (clientId?: string | null) =>
     clients.find((client) => client.id === clientId)?.name ?? null;
 
+  /*
+   * Filtering runs over the list the page has already loaded. There is no search
+   * endpoint, so this narrows what is on screen rather than querying the server.
+   */
+  const needle = query.trim().toLowerCase();
+
+  const visible = needle
+    ? projects.filter((project) => {
+        const haystack = [
+          project.name,
+          project.description,
+          clientName(project.clientId),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        return haystack.includes(needle);
+      })
+    : projects;
+
+  /** What archiving would leave behind on the other list pages. */
+  const archiveImpact = (projectId: string) => ({
+    tasks: tasks.filter((task) => task.projectId === projectId).length,
+    deliverables: deliverables.filter(
+      (deliverable) => deliverable.projectId === projectId,
+    ).length,
+  });
+
+  const impact = archiveTarget ? archiveImpact(archiveTarget.id) : null;
+
   const openCreate = () => {
     setEditing(null);
-    setForm(emptyForm);
-    setFormError(null);
+    setActionError(null);
     setOpen(true);
   };
 
   const openEdit = (project: Project) => {
     setEditing(project);
-    setForm({
-      name: project.name,
-      description: project.description ?? "",
-      clientId: project.clientId ?? "",
-      status: project.status,
-      startDate: project.startDate?.slice(0, 10) ?? "",
-      endDate: project.endDate?.slice(0, 10) ?? "",
-      budget: project.budget ?? "",
-    });
-    setFormError(null);
+    setActionError(null);
     setOpen(true);
-  };
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    setFormError(null);
-
-    const payload: CreateProjectInput = {
-      name: form.name.trim(),
-      status: form.status,
-    };
-
-    if (form.description.trim()) {
-      payload.description = form.description.trim();
-    }
-
-    if (form.clientId) {
-      payload.clientId = form.clientId;
-    }
-
-    if (form.startDate) {
-      payload.startDate = new Date(form.startDate).toISOString();
-    }
-
-    if (form.endDate) {
-      payload.endDate = new Date(form.endDate).toISOString();
-    }
-
-    if (form.budget.trim()) {
-      payload.budget = form.budget.trim();
-    }
-
-    try {
-      setSubmitting(true);
-
-      if (editing) {
-        const updated = await projectsService.update(editing.id, payload);
-
-        setProjects((prev) =>
-          prev.map((item) => (item.id === updated.id ? updated : item)),
-        );
-      } else {
-        const created = await projectsService.create(payload);
-
-        setProjects((prev) => [created, ...prev]);
-      }
-
-      setOpen(false);
-      setForm(emptyForm);
-      setEditing(null);
-    } catch (error) {
-      setFormError(getApiErrorMessage(error));
-    } finally {
-      setSubmitting(false);
-    }
   };
 
   const updateStatus = async (project: Project, status: ProjectStatus) => {
@@ -185,7 +157,7 @@ const ProjectsPage = () => {
     );
 
     try {
-      setBusyId(project.id);
+      setPending({ id: project.id, action: "status" });
 
       const updated = await projectsService.update(project.id, { status });
 
@@ -196,249 +168,305 @@ const ProjectsPage = () => {
       setProjects((prev) =>
         prev.map((item) => (item.id === project.id ? previous : item)),
       );
-      setActionError(getApiErrorMessage(error));
+
+      const description = getApiErrorMessage(error);
+
+      setActionError(description);
+      toast({ tone: "error", title: "Could not change status", description });
     } finally {
-      setBusyId(null);
+      setPending(null);
+    }
+  };
+
+  const archive = async (project: Project) => {
+    setActionError(null);
+
+    try {
+      setPending({ id: project.id, action: "archive" });
+
+      await projectsService.archive(project.id);
+
+      setProjects((prev) => prev.filter((item) => item.id !== project.id));
+      setArchiveTarget(null);
+      toast({
+        tone: "success",
+        title: "Project archived",
+        description: project.name,
+      });
+    } catch (error) {
+      const description = getApiErrorMessage(error);
+
+      setActionError(description);
+      setArchiveTarget(null);
+      toast({ tone: "error", title: "Could not archive project", description });
+    } finally {
+      setPending(null);
     }
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-6 py-8 lg:px-10">
-      <header className="motion-enter flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display text-[28px] font-light text-ink">
-            Projects
-          </h1>
-          <p className="mt-2 max-w-2xl text-pretty text-[14px] leading-relaxed text-ink-muted">
-            Commissions currently in flight.
+    <>
+      <div className="mx-auto w-full max-w-[1400px] px-6 py-8 lg:px-10">
+        <header className="motion-enter flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="font-display text-[28px] font-light text-ink">
+              Projects
+            </h1>
+            <p className="mt-2 max-w-2xl text-pretty text-[14px] leading-relaxed text-ink-muted">
+              Commissions currently in flight.
+            </p>
+          </div>
+
+          <Button variant="primary" onClick={openCreate}>
+            <Plus className="size-4" aria-hidden="true" />
+            New project
+          </Button>
+        </header>
+
+        {actionError && (
+          <p
+            role="alert"
+            className="mt-4 rounded-sm border border-danger/30 bg-danger/10 px-3 py-2 text-[13px] text-danger"
+          >
+            {actionError}
           </p>
-        </div>
+        )}
 
-        <Button onClick={openCreate}>
-          <Plus className="size-4" aria-hidden="true" />
-          New Project
-        </Button>
-      </header>
-
-      {actionError && (
-        <p
-          role="alert"
-          className="mt-4 rounded-sm border border-danger/30 bg-danger/10 px-3 py-2 text-[13px] text-danger"
-        >
-          {actionError}
-        </p>
-      )}
-
-      <Card className="mt-6 motion-enter">
-        <CardHeader
-          title="All Projects"
-          description={`${projects.length} projects`}
-        />
-        <CardBody>
-          {loading ? (
-            <div className="py-8 text-center text-[14px] text-ink-subtle">
-              Loading...
-            </div>
-          ) : loadError && projects.length === 0 ? (
-            <EmptyState
-              title="Could not load projects"
-              description={loadError}
-              tone="error"
-              size="sm"
+        {!loading && projects.length > 0 && (
+          <div className="mt-6 max-w-sm motion-enter">
+            <SearchField
+              label="Search projects"
+              placeholder="Search by name, client or description"
+              value={query}
+              onChange={setQuery}
             />
-          ) : projects.length === 0 ? (
-            <EmptyState
-              icon={<FolderPlus className="size-4" aria-hidden="true" />}
-              title="No projects yet"
-              description="Create your first project to get started."
-              action={
-                <Button onClick={openCreate} size="sm">
-                  <Plus className="size-4" aria-hidden="true" />
-                  New Project
-                </Button>
-              }
-              size="sm"
-            />
-          ) : (
-            <ul className="space-y-2">
-              {projects.map((project) => {
-                const isBusy = busyId === project.id;
-                const client = clientName(project.clientId);
+          </div>
+        )}
 
-                return (
-                  <li
-                    key={project.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-line p-3"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => openEdit(project)}
-                      className="min-w-0 flex-1 cursor-pointer text-left"
+        <Card className="mt-6 motion-enter">
+          <CardHeader
+            title="All projects"
+            description={
+              loading
+                ? "Loading…"
+                : `${pluralise(visible.length, "project")}${
+                    needle && visible.length !== projects.length
+                      ? ` of ${projects.length}`
+                      : ""
+                  }`
+            }
+          />
+
+          <CardBody>
+            {loading ? (
+              <div
+                role="status"
+                className="py-8 text-center text-[14px] text-ink-subtle"
+              >
+                Loading…
+              </div>
+            ) : loadError && projects.length === 0 ? (
+              <EmptyState
+                title="Could not load projects"
+                description={loadError}
+                tone="error"
+                size="sm"
+                action={
+                  <Button variant="secondary" onClick={load}>
+                    Try again
+                  </Button>
+                }
+              />
+            ) : projects.length === 0 ? (
+              <EmptyState
+                icon={<FolderPlus className="size-4" aria-hidden="true" />}
+                title="No projects yet"
+                description="Create your first project to start tracking tasks and deliverables."
+                size="sm"
+                action={
+                  <Button variant="primary" onClick={openCreate} size="sm">
+                    <Plus className="size-4" aria-hidden="true" />
+                    New project
+                  </Button>
+                }
+              />
+            ) : needle && visible.length === 0 ? (
+              <EmptyState
+                title="No matching projects"
+                description={`Nothing matches “${query.trim()}”.`}
+                size="sm"
+                action={
+                  <Button variant="secondary" onClick={() => setQuery("")}>
+                    Clear search
+                  </Button>
+                }
+              />
+            ) : (
+              <ul className="space-y-2">
+                {visible.map((project) => {
+                  const isPending = pending?.id === project.id;
+                  const client = clientName(project.clientId);
+                  const dates = formatDateRange(
+                    project.startDate,
+                    project.endDate,
+                  );
+                  const budget = formatAmount(project.budget);
+
+                  return (
+                    <li
+                      key={project.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-line p-3"
                     >
-                      <span className="flex flex-wrap items-center gap-2">
-                        <span className="text-[14px] font-medium text-ink">
-                          {project.name}
-                        </span>
-                        <Badge tone={STATUS_TONE[project.status]} dot>
-                          {humanise(project.status)}
-                        </Badge>
-                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {/* The name is the route into everything attached to
+                              this project. */}
+                          <Link
+                            href={`/projects/${project.id}`}
+                            className="truncate rounded-sm text-[14px] font-medium text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                          >
+                            {project.name}
+                          </Link>
 
-                      <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-subtle">
-                        {client && <span>{client}</span>}
-                        {project.description && (
-                          <span className="line-clamp-1">
-                            {project.description}
-                          </span>
-                        )}
-                      </span>
-                    </button>
+                          <StatusBadge status={project.status} />
 
-                    <div className="flex shrink-0 items-center gap-2">
-                      <Select
-                        aria-label={`Status for ${project.name}`}
-                        options={PROJECT_STATUS_OPTIONS}
-                        value={project.status}
-                        size="sm"
-                        fullWidth={false}
-                        disabled={isBusy}
-                        onChange={(value) =>
-                          updateStatus(project, value as ProjectStatus)
-                        }
-                        className="w-[148px]"
-                      />
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </CardBody>
-      </Card>
+                          {client && (
+                            <span className="truncate text-[13px] text-ink-muted">
+                              {client}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Budget and dates were collected on the form but never
+                            shown anywhere, so they read as decorative. */}
+                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-subtle tabular-nums">
+                          {dates && <span>{dates}</span>}
+                          {budget && <span>GH₵{budget}</span>}
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Select
+                          aria-label={`Status for ${project.name}`}
+                          options={PROJECT_STATUS_OPTIONS}
+                          value={project.status}
+                          size="sm"
+                          fullWidth={false}
+                          disabled={isPending}
+                          onChange={(value) =>
+                            updateStatus(project, value as ProjectStatus)
+                          }
+                          className="w-[148px]"
+                        />
+
+                        <Button
+                          size="sm"
+                          variant="tertiary"
+                          disabled={isPending}
+                          onClick={() => openEdit(project)}
+                          aria-label={`Edit ${project.name}`}
+                        >
+                          <Pencil className="size-4" aria-hidden="true" />
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="tertiary"
+                          disabled={isPending}
+                          onClick={() => setArchiveTarget(project)}
+                          aria-label={`Archive ${project.name}`}
+                        >
+                          <Archive className="size-4" aria-hidden="true" />
+                        </Button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </CardBody>
+        </Card>
+      </div>
+
+      <ProjectFormDialog
+        open={open}
+        project={editing}
+        clients={clients}
+        onClose={() => setOpen(false)}
+        onCreated={(created) => {
+          setProjects((prev) => [created, ...prev]);
+          toast({
+            tone: "success",
+            title: "Project created",
+            description: created.name,
+          });
+        }}
+        onUpdated={(updated) => {
+          setProjects((prev) =>
+            prev.map((item) => (item.id === updated.id ? updated : item)),
+          );
+          toast({
+            tone: "success",
+            title: "Project updated",
+            description: updated.name,
+          });
+        }}
+      />
 
       <Dialog
-        open={open}
-        onClose={() => setOpen(false)}
-        label={editing ? "Edit Project" : "New Project"}
-        title={editing ? `Edit ${editing.name}` : "New Project"}
-      >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label
-              className="mb-1 block text-sm text-ink"
-              htmlFor="project-name"
-            >
-              Name
-            </label>
-            <Input
-              id="project-name"
-              value={form.name}
-              onChange={(event) =>
-                setForm({ ...form, name: event.target.value })
-              }
-              required
-            />
-          </div>
-
-          <div>
-            <label
-              className="mb-1 block text-sm text-ink"
-              htmlFor="project-description"
-            >
-              Description
-            </label>
-            <Input
-              id="project-description"
-              value={form.description}
-              onChange={(event) =>
-                setForm({ ...form, description: event.target.value })
-              }
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Select
-              id="project-client"
-              label="Client"
-              placeholder="None"
-              options={clients.map((client) => ({
-                value: client.id,
-                label: client.name,
-              }))}
-              value={form.clientId}
-              onChange={(value) => setForm({ ...form, clientId: value })}
-            />
-
-            <Select
-              id="project-status"
-              label="Status"
-              options={PROJECT_STATUS_OPTIONS}
-              value={form.status}
-              onChange={(value) =>
-                setForm({ ...form, status: value as ProjectStatus })
-              }
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <DateInput
-              id="project-start"
-              label="Start date"
-              value={form.startDate}
-              onChange={(value) => setForm({ ...form, startDate: value })}
-            />
-
-            <DateInput
-              id="project-end"
-              label="End date"
-              value={form.endDate}
-              min={form.startDate || undefined}
-              onChange={(value) => setForm({ ...form, endDate: value })}
-            />
-          </div>
-
-          <div>
-            <label
-              className="mb-1 block text-sm text-ink"
-              htmlFor="project-budget"
-            >
-              Budget
-            </label>
-            <Input
-              id="project-budget"
-              value={form.budget}
-              onChange={(event) =>
-                setForm({ ...form, budget: event.target.value })
-              }
-              placeholder="e.g. 250000"
-            />
-          </div>
-
-          {formError && (
-            <p role="alert" className="text-[13px] text-danger">
-              {formError}
-            </p>
-          )}
-
-          <div className="mt-6 flex justify-end gap-2">
+        open={archiveTarget !== null}
+        onClose={() => setArchiveTarget(null)}
+        label="Archive project"
+        title="Archive this project?"
+        hideClose
+        footer={
+          <>
             <Button
-              type="button"
               variant="secondary"
-              onClick={() => setOpen(false)}
+              onClick={() => setArchiveTarget(null)}
+              disabled={archiving}
             >
               Cancel
             </Button>
             <Button
-              type="submit"
-              loading={submitting}
-              disabled={submitting || !form.name.trim()}
+              variant="destructive"
+              loading={archiving}
+              onClick={() => archiveTarget && archive(archiveTarget)}
             >
-              {editing ? "Save Changes" : "Create Project"}
+              Archive project
             </Button>
+          </>
+        }
+      >
+        {archiveTarget && (
+          <div className="space-y-3 text-[13px] leading-relaxed text-ink-muted">
+            <p>
+              <span className="font-medium text-ink">
+                {archiveTarget.name}
+              </span>{" "}
+              will be removed from this list. Archiving keeps the project and its
+              history — it can be restored later.
+            </p>
+
+            {/* Archiving is not a cascade, and saying otherwise would be a lie
+                the user only discovers on the Tasks or Deliverables page. */}
+            {impact && (impact.tasks > 0 || impact.deliverables > 0) && (
+              <p>
+                {[
+                  impact.tasks > 0 && pluralise(impact.tasks, "task"),
+                  impact.deliverables > 0 &&
+                    pluralise(impact.deliverables, "deliverable"),
+                ]
+                  .filter(Boolean)
+                  .join(" and ")}{" "}
+                attached to this project will stay on the Tasks and Deliverables
+                pages.
+              </p>
+            )}
           </div>
-        </form>
+        )}
       </Dialog>
-    </div>
+    </>
   );
 };
 

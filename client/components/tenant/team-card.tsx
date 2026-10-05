@@ -11,12 +11,15 @@ import EmptyState from "@/components/ui/empty-state";
 import Input from "@/components/ui/input";
 import Select from "@/components/ui/select";
 import { getApiErrorMessage } from "@/lib/api/errors";
+import { initials } from "@/lib/format";
 import {
+  memberName,
   tenancyApi,
   type CurrentTenant,
   type TenantMember,
 } from "@/actions/tenancy";
 import type { TenantRole } from "@/actions/auth";
+import useAuthStore from "@/store/use-auth-store";
 import {
   addMemberSchema,
   updateMemberRoleSchema,
@@ -56,6 +59,10 @@ export default function TeamCard() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<TenantMember | null>(null);
+
+  /** Used only to mark the viewer's own row. */
+  const currentUserId = useAuthStore((state) => state.user?.id ?? null);
 
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
@@ -137,6 +144,7 @@ export default function TeamCard() {
     try {
       await tenancyApi.removeMember(member.userId);
       setMembers((prev) => prev.filter((item) => item.userId !== member.userId));
+      setRemoving(null);
     } catch (error) {
       setActionError(getApiErrorMessage(error));
     } finally {
@@ -218,21 +226,45 @@ export default function TeamCard() {
               // viewer without TENANT_MEMBERS_MANAGE.
               const editable =
                 member.role !== "OWNER" && canManage(tenant?.role);
+              const isViewer = member.userId === currentUserId;
 
               return (
                 <li
                   key={member.userId}
                   className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-line p-3"
                 >
-                  <span className="min-w-0 flex-1 truncate text-[14px] text-ink">
-                    {member.email}
+                  <span className="flex min-w-0 flex-1 items-center gap-3">
+                    <span
+                      aria-hidden="true"
+                      className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-subtle text-[11px] text-ink-muted"
+                    >
+                      {initials(memberName(member))}
+                    </span>
+
+                    <span className="min-w-0">
+                      <span className="flex flex-wrap items-center gap-x-2 text-[14px] text-ink">
+                        <span className="truncate">
+                          {memberName(member)}
+                        </span>
+
+                        {isViewer && (
+                          <span className="text-[12px] text-ink-subtle">
+                            You
+                          </span>
+                        )}
+                      </span>
+
+                      <span className="block truncate text-[13px] text-ink-subtle">
+                        {member.email}
+                      </span>
+                    </span>
                   </span>
 
                   <span className="flex shrink-0 items-center gap-2">
                     {editable ? (
                       <>
                         <Select
-                          aria-label={`Role for ${member.email}`}
+                          aria-label={`Role for ${memberName(member)}`}
                           options={ROLE_OPTIONS}
                           value={member.role}
                           size="sm"
@@ -248,8 +280,8 @@ export default function TeamCard() {
                           size="sm"
                           variant="tertiary"
                           disabled={isBusy}
-                          onClick={() => remove(member)}
-                          aria-label={`Remove ${member.email}`}
+                          onClick={() => setRemoving(member)}
+                          aria-label={`Remove ${memberName(member)}`}
                         >
                           <Trash2 className="size-4" aria-hidden="true" />
                         </Button>
@@ -272,6 +304,40 @@ export default function TeamCard() {
           </p>
         )}
       </CardBody>
+
+      <Dialog
+        open={removing !== null}
+        onClose={() => setRemoving(null)}
+        label="Remove member"
+        title="Remove this member?"
+        hideClose
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setRemoving(null)}
+              disabled={busyId !== null}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              loading={busyId !== null}
+              onClick={() => removing && remove(removing)}
+            >
+              Remove member
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[13px] leading-relaxed text-ink-muted">
+          <span className="font-medium text-ink">
+            {removing ? memberName(removing) : ""}
+          </span>{" "}
+          will lose access to this practice. Their projects, tasks and files are
+          not deleted.
+        </p>
+      </Dialog>
 
       <Dialog
         open={open}

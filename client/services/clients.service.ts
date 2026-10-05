@@ -29,6 +29,27 @@ export type CreateClientInput = {
   status?: ClientStatus;
 };
 
+/**
+ * Mirrors the server's `UpdateClientDto`.
+ *
+ * `null` is accepted deliberately: the DTO validates with `@IsOptional()`, which
+ * skips `null`, and every optional column is nullable. It is how a field is
+ * cleared — `PATCH /clients/:id` writes only the keys it receives, so omitting
+ * one leaves the stored value in place while the UI would otherwise report the
+ * clear as having succeeded.
+ *
+ * There is deliberately no `isArchived` here: the column exists and the list
+ * endpoint filters on it, but the update DTO does not accept it, so archiving is
+ * not something the API can currently do. Adding it to `UpdateClientDto` is the
+ * server-side prerequisite for an archive action.
+ */
+export type UpdateClientInput = {
+  [K in keyof CreateClientInput]?: CreateClientInput[K] | null;
+};
+
+/** Statuses the UI offers, in the order a client moves through them. */
+export const CLIENT_STATUSES: ClientStatus[] = ["ACTIVE", "INACTIVE", "ARCHIVED"];
+
 export const clientsService = {
   async getAll(): Promise<Client[]> {
     const response = await api.get<Client[]>("/clients");
@@ -45,7 +66,7 @@ export const clientsService = {
     return response.data;
   },
 
-  async update(id: string, input: Partial<CreateClientInput>): Promise<Client> {
+  async update(id: string, input: UpdateClientInput): Promise<Client> {
     const response = await api.patch<Client>(`/clients/${id}`, input);
     return response.data;
   },

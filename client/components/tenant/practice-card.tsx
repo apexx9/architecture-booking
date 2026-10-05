@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
+import Badge from "@/components/ui/badge";
 import Button from "@/components/ui/button";
 import Card, { CardBody, CardHeader } from "@/components/ui/card";
 import EmptyState from "@/components/ui/empty-state";
 import Input from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast";
 import { getApiErrorMessage } from "@/lib/api/errors";
+import { getRoleLabel } from "@/lib/domain/status";
 import { tenancyApi, type CurrentTenant } from "@/actions/tenancy";
 import { updateTenantSchema } from "@/schema/tenancy.schema";
 
@@ -31,30 +33,33 @@ export default function PracticeCard() {
   const [nameError, setNameError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const { toast } = useToast();
+
+  const load = async () => {
+    setLoading(true);
+    setLoadError(null);
+
+    try {
+      const data = await tenancyApi.getCurrentTenant();
+
+      setTenant(data);
+      setName(data.name);
+    } catch (error) {
+      setLoadError(getApiErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
 
-    tenancyApi
-      .getCurrentTenant()
-      .then((data) => {
-        if (cancelled) {
-          return;
-        }
+    const run = async () => {
+      if (cancelled) return;
+      await load();
+    };
 
-        setTenant(data);
-        setName(data.name);
-        setLoadError(null);
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setLoadError(getApiErrorMessage(error));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
+    run();
 
     return () => {
       cancelled = true;
@@ -81,8 +86,16 @@ export default function PracticeCard() {
       await tenancyApi.renameTenant(parsed.data);
 
       setTenant((prev) => (prev ? { ...prev, name: parsed.data.name } : prev));
+      toast({
+        tone: "success",
+        title: "Practice renamed",
+        description: parsed.data.name,
+      });
     } catch (error) {
-      setActionError(getApiErrorMessage(error));
+      const description = getApiErrorMessage(error);
+
+      setActionError(description);
+      toast({ tone: "error", title: "Could not rename practice", description });
     } finally {
       setSaving(false);
     }
@@ -93,8 +106,11 @@ export default function PracticeCard() {
       <CardHeader title="Practice" description={tenant?.name ?? undefined} />
       <CardBody>
         {loading ? (
-          <div className="py-4 text-center text-[14px] text-ink-subtle">
-            Loading...
+          <div
+            role="status"
+            className="py-4 text-center text-[14px] text-ink-subtle"
+          >
+            Loading…
           </div>
         ) : loadError || !tenant ? (
           <EmptyState
@@ -102,6 +118,11 @@ export default function PracticeCard() {
             description={loadError ?? undefined}
             tone="error"
             size="sm"
+            action={
+              <Button variant="secondary" onClick={load}>
+                Try again
+              </Button>
+            }
           />
         ) : (
           <form onSubmit={save} className="space-y-4">
@@ -125,6 +146,7 @@ export default function PracticeCard() {
               {canManage(tenant.role) && (
                 <Button
                   type="submit"
+                  variant="primary"
                   loading={saving}
                   disabled={saving || name === tenant.name}
                 >
@@ -151,8 +173,9 @@ export default function PracticeCard() {
               </p>
             )}
 
+            {/* The raw enum value used to be rendered here. */}
             <Badge tone={tenant.role === "OWNER" ? "info" : "neutral"} dot>
-              Your role: {tenant.role}
+              Your role: {getRoleLabel(tenant.role)}
             </Badge>
           </form>
         )}

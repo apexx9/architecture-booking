@@ -9,7 +9,10 @@ import Card, { CardBody, CardHeader } from "@/components/ui/card";
 import Dialog from "@/components/ui/dialog";
 import EmptyState from "@/components/ui/empty-state";
 import Input from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast";
 import { getApiErrorMessage } from "@/lib/api/errors";
+import { pluralise } from "@/lib/format";
+import { getRoleLabel } from "@/lib/domain/status";
 import { tenancyApi, type TenantSummary } from "@/actions/tenancy";
 import { createTenantSchema } from "@/schema/tenancy.schema";
 
@@ -31,27 +34,30 @@ export default function PracticesCard() {
   const [formError, setFormError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
+  const { toast } = useToast();
+
+  const load = async () => {
+    setLoading(true);
+    setLoadError(null);
+
+    try {
+      setTenants(await tenancyApi.listTenants());
+    } catch (error) {
+      setLoadError(getApiErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
 
-    tenancyApi
-      .listTenants()
-      .then((data) => {
-        if (!cancelled) {
-          setTenants(data);
-          setLoadError(null);
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setLoadError(getApiErrorMessage(error));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
+    const run = async () => {
+      if (cancelled) return;
+      await load();
+    };
+
+    run();
 
     tenancyApi
       .getCurrentTenant()
@@ -90,8 +96,16 @@ export default function PracticesCard() {
       setTenants((prev) => [...prev, created]);
       setOpen(false);
       setName("");
+      toast({
+        tone: "success",
+        title: "Practice created",
+        description: created.name,
+      });
     } catch (error) {
-      setFormError(getApiErrorMessage(error));
+      const description = getApiErrorMessage(error);
+
+      setFormError(description);
+      toast({ tone: "error", title: "Could not create practice", description });
     } finally {
       setCreating(false);
     }
@@ -101,18 +115,23 @@ export default function PracticesCard() {
     <Card className="motion-enter">
       <CardHeader
         title="Practices"
-        description={`${tenants.length} practice${tenants.length === 1 ? "" : "s"} you belong to`}
+        description={
+          loading ? "Loading…" : `${pluralise(tenants.length, "practice")} you belong to`
+        }
         action={
-          <Button size="sm" onClick={() => setOpen(true)}>
+          <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
             <FolderPlus className="size-4" aria-hidden="true" />
-            New Practice
+            New practice
           </Button>
         }
       />
       <CardBody>
         {loading ? (
-          <div className="py-8 text-center text-[14px] text-ink-subtle">
-            Loading...
+          <div
+            role="status"
+            className="py-8 text-center text-[14px] text-ink-subtle"
+          >
+            Loading…
           </div>
         ) : loadError && tenants.length === 0 ? (
           <EmptyState
@@ -120,6 +139,11 @@ export default function PracticesCard() {
             description={loadError}
             tone="error"
             size="sm"
+            action={
+              <Button variant="secondary" onClick={load}>
+                Try again
+              </Button>
+            }
           />
         ) : tenants.length === 0 ? (
           <EmptyState
@@ -127,6 +151,12 @@ export default function PracticesCard() {
             title="No practices"
             description="You do not belong to a practice yet."
             size="sm"
+            action={
+              <Button variant="primary" onClick={() => setOpen(true)} size="sm">
+                <FolderPlus className="size-4" aria-hidden="true" />
+                New practice
+              </Button>
+            }
           />
         ) : (
           <ul className="space-y-2">
@@ -143,7 +173,9 @@ export default function PracticesCard() {
                       Current
                     </Badge>
                   )}
-                  <Badge tone="neutral">{tenant.role}</Badge>
+                  <Badge tone="neutral" dot={false}>
+                    {getRoleLabel(tenant.role)}
+                  </Badge>
                 </span>
               </li>
             ))}
@@ -153,22 +185,50 @@ export default function PracticesCard() {
 
       <Dialog
         open={open}
-        onClose={() => setOpen(false)}
-        label="New Practice"
-        title="New Practice"
+        onClose={() => {
+          if (creating) return;
+
+          setOpen(false);
+        }}
+        label="New practice"
+        title="New practice"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setOpen(false)}
+              disabled={creating}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="new-practice-form"
+              variant="primary"
+              loading={creating}
+              disabled={creating || !name.trim()}
+            >
+              Create practice
+            </Button>
+          </>
+        }
       >
-        <form onSubmit={create} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm text-ink" htmlFor="new-tenant">
-              Practice name
-            </label>
-            <Input
-              id="new-tenant"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              required
-            />
-          </div>
+        <form
+          id="new-practice-form"
+          onSubmit={create}
+          className="space-y-4"
+          noValidate
+        >
+          <Input
+            id="new-tenant"
+            name="name"
+            label="Practice name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            data-autofocus
+            required
+          />
 
           <p className="text-[13px] text-ink-subtle">
             You become the owner. Switch to it from the sidebar afterwards.
@@ -179,23 +239,6 @@ export default function PracticesCard() {
               {formError}
             </p>
           )}
-
-          <div className="mt-6 flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              loading={creating}
-              disabled={creating || !name.trim()}
-            >
-              Create Practice
-            </Button>
-          </div>
         </form>
       </Dialog>
     </Card>

@@ -39,7 +39,23 @@ export type CreateTaskInput = {
   isArchived?: boolean;
 };
 
-export type UpdateTaskInput = Partial<Omit<CreateTaskInput, "projectId">>;
+/**
+ * Mirrors the server's `UpdateTaskDto`, minus `projectId` which is required and
+ * not reassignable from the task UI.
+ *
+ * `null` clears an optional field: the DTO's `@IsOptional()` accepts it and the
+ * service spreads the DTO into the update. Omitting a key means "leave alone",
+ * so a field the user emptied must be sent as `null` rather than dropped.
+ *
+ * The server sets `completedAt` itself when `status` becomes `DONE`, so the UI
+ * never sends it.
+ */
+export type UpdateTaskInput = {
+  [K in keyof Omit<CreateTaskInput, "projectId">]?: Omit<
+    CreateTaskInput,
+    "projectId"
+  >[K] | null;
+};
 
 /** Statuses the UI offers, in the order a task moves through them. */
 export const TASK_STATUSES: TaskStatus[] = [
@@ -89,7 +105,12 @@ export const tasksService = {
     return data;
   },
 
-  async remove(id: string): Promise<void> {
+  /**
+   * `DELETE /tasks/:id` does not delete; it sets `isArchived = true`, which drops
+   * the task out of the list endpoints. So the action is an archive, and it is
+   * presented as one.
+   */
+  async archive(id: string): Promise<void> {
     await api.delete(`/tasks/${id}`);
   },
 };

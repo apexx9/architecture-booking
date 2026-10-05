@@ -18,8 +18,9 @@ export type FileRecord = {
 };
 
 /**
- * A file attaches to at most one parent. Pass exactly one id; the server stores
- * it and the column it lands in determines where the file shows up.
+ * A file can be linked to several parents at once — the DTO accepts all three
+ * ids as optional — which is how a file uploaded against a deliverable also
+ * shows up on its project. Passing only `deliverableId` is the common case.
  */
 export type UploadFileInput = {
   file: File;
@@ -66,6 +67,12 @@ export const filesService = {
     return data;
   },
 
+  /**
+ * `DELETE /files/:id` archives the file record, not the stored object: the row
+ * gets `isArchived = true` and leaves the list endpoints, while the uploaded
+ * file stays on disk. The action is presented as a removal from the deliverable
+ * rather than as a permanent delete, because nothing is destroyed.
+ */
   async remove(id: string): Promise<void> {
     await api.delete(`/files/${id}`);
   },

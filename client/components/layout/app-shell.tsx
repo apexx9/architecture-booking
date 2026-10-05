@@ -5,12 +5,18 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import Logo from "@/components/ui/logo";
+import LogoMark from "@/components/ui/logo-mark";
 import WorkspaceNav, {
   type NavGroup,
 } from "@/components/workspace/workspace-nav";
 import WorkspaceMobileNav from "@/components/workspace/workspace-mobile-nav";
 import WorkspaceTopbar from "@/components/workspace/workspace-topbar";
 
+/*
+ * Group meaning, order, hrefs and `ready` flags are the information architecture
+ * and belong here. Iconography is presentation and lives with the navigation
+ * that renders it — see `NAV_ICONS` in `components/workspace/workspace-nav.tsx`.
+ */
 const NAV_GROUPS: NavGroup[] = [
   {
     label: "Overview",
@@ -104,7 +110,14 @@ const AppShell = ({ children }: AppShellProps) => {
             aria-label="Renove home"
             className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink"
           >
-            <Logo variant="dark" />
+            {/* The wordmark does not fit in a 4rem rail — it was clipped to
+                unreadable slivers. The arch mark is the same brand signal at a
+                size that actually fits. */}
+            {isCollapsed ? (
+              <LogoMark size={24} className="text-ink" />
+            ) : (
+              <Logo variant="dark" />
+            )}
           </Link>
         </div>
 

@@ -49,9 +49,20 @@ export type CreateDeliverableInput = {
   isArchived?: boolean;
 };
 
-export type UpdateDeliverableInput = Partial<
-  Omit<CreateDeliverableInput, "projectId">
->;
+/**
+ * Mirrors the server's `UpdateDeliverableDto`, minus `projectId`, which is
+ * required and is not reassignable from the deliverable UI.
+ *
+ * `null` clears an optional field: the DTO's `@IsOptional()` accepts it and the
+ * service spreads the DTO into the update. Omitting a key means "leave alone",
+ * so a field the user emptied must be sent as `null` rather than dropped.
+ */
+export type UpdateDeliverableInput = {
+  [K in keyof Omit<CreateDeliverableInput, "projectId">]?: Omit<
+    CreateDeliverableInput,
+    "projectId"
+  >[K] | null;
+};
 
 export const DELIVERABLE_STATUS_ORDER: DeliverableStatus[] = [
   "IN_PROGRESS",
@@ -96,7 +107,12 @@ export const deliverablesService = {
     return data;
   },
 
-  async remove(id: string): Promise<void> {
+  /**
+   * `DELETE /deliverables/:id` does not delete; it sets `isArchived = true`,
+   * which drops the deliverable out of the list endpoints. So the action is an
+   * archive, and it is presented as one. Attached files are untouched.
+   */
+  async archive(id: string): Promise<void> {
     await api.delete(`/deliverables/${id}`);
   },
 };

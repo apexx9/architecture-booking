@@ -20,7 +20,16 @@ export type CreateProjectPhaseInput = {
   isArchived?: boolean;
 };
 
-export type UpdateProjectPhaseInput = Partial<CreateProjectPhaseInput>;
+/**
+ * Mirrors the server's `UpdateProjectPhaseDto`.
+ *
+ * `null` clears an optional field: the DTO's `@IsOptional()` accepts it and the
+ * service spreads the DTO into the update. Omitting a key means "leave alone",
+ * so a field the user emptied must be sent as `null` rather than dropped.
+ */
+export type UpdateProjectPhaseInput = {
+  [K in keyof CreateProjectPhaseInput]?: CreateProjectPhaseInput[K] | null;
+};
 
 /**
  * Phases are tenant-wide templates ("Concept Design", "Documentation"), not
@@ -61,7 +70,12 @@ export const phasesService = {
     return data;
   },
 
-  async remove(id: string): Promise<void> {
+  /**
+   * `DELETE /project-phases/:id` does not delete; it sets `isArchived = true`,
+   * which drops the phase out of the list endpoint. So the action is an archive,
+   * and it is presented as one.
+   */
+  async archive(id: string): Promise<void> {
     await api.delete(`/project-phases/${id}`);
   },
 };
