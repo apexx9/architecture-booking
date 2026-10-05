@@ -6,9 +6,11 @@ import { FolderPlus, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Button from "@/components/ui/button";
 import Card, { CardBody, CardHeader } from "@/components/ui/card";
+import DateInput from "@/components/ui/date-input";
 import Dialog from "@/components/ui/dialog";
 import EmptyState from "@/components/ui/empty-state";
 import Input from "@/components/ui/input";
+import Select from "@/components/ui/select";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import {
   PROJECT_STATUSES,
@@ -33,6 +35,11 @@ const humanise = (value: string) =>
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+
+const PROJECT_STATUS_OPTIONS = PROJECT_STATUSES.map((status) => ({
+  value: status,
+  label: humanise(status),
+}));
 
 const emptyForm = {
   name: "",
@@ -288,30 +295,18 @@ const ProjectsPage = () => {
                     </button>
 
                     <div className="flex shrink-0 items-center gap-2">
-                      <label
-                        className="sr-only"
-                        htmlFor={`project-status-${project.id}`}
-                      >
-                        Status for {project.name}
-                      </label>
-                      <select
-                        id={`project-status-${project.id}`}
+                      <Select
+                        aria-label={`Status for ${project.name}`}
+                        options={PROJECT_STATUS_OPTIONS}
                         value={project.status}
+                        size="sm"
+                        fullWidth={false}
                         disabled={isBusy}
-                        onChange={(event) =>
-                          updateStatus(
-                            project,
-                            event.target.value as ProjectStatus,
-                          )
+                        onChange={(value) =>
+                          updateStatus(project, value as ProjectStatus)
                         }
-                        className="h-8 rounded-sm border border-line bg-surface px-2 text-[12px] text-ink disabled:opacity-50"
-                      >
-                        {PROJECT_STATUSES.map((status) => (
-                          <option key={status} value={status}>
-                            {humanise(status)}
-                          </option>
-                        ))}
-                      </select>
+                        className="w-[148px]"
+                      />
                     </div>
                   </li>
                 );
@@ -362,91 +357,44 @@ const ProjectsPage = () => {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label
-                className="mb-1 block text-sm text-ink"
-                htmlFor="project-client"
-              >
-                Client
-              </label>
-              <select
-                id="project-client"
-                value={form.clientId}
-                onChange={(event) =>
-                  setForm({ ...form, clientId: event.target.value })
-                }
-                className="h-10 w-full rounded-sm border border-line bg-surface px-3 text-sm text-ink"
-              >
-                <option value="">None</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              id="project-client"
+              label="Client"
+              placeholder="None"
+              options={clients.map((client) => ({
+                value: client.id,
+                label: client.name,
+              }))}
+              value={form.clientId}
+              onChange={(value) => setForm({ ...form, clientId: value })}
+            />
 
-            <div>
-              <label
-                className="mb-1 block text-sm text-ink"
-                htmlFor="project-status"
-              >
-                Status
-              </label>
-              <select
-                id="project-status"
-                value={form.status}
-                onChange={(event) =>
-                  setForm({
-                    ...form,
-                    status: event.target.value as ProjectStatus,
-                  })
-                }
-                className="h-10 w-full rounded-sm border border-line bg-surface px-3 text-sm text-ink"
-              >
-                {PROJECT_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {humanise(status)}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              id="project-status"
+              label="Status"
+              options={PROJECT_STATUS_OPTIONS}
+              value={form.status}
+              onChange={(value) =>
+                setForm({ ...form, status: value as ProjectStatus })
+              }
+            />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label
-                className="mb-1 block text-sm text-ink"
-                htmlFor="project-start"
-              >
-                Start date
-              </label>
-              <Input
-                id="project-start"
-                type="date"
-                value={form.startDate}
-                onChange={(event) =>
-                  setForm({ ...form, startDate: event.target.value })
-                }
-              />
-            </div>
+            <DateInput
+              id="project-start"
+              label="Start date"
+              value={form.startDate}
+              onChange={(value) => setForm({ ...form, startDate: value })}
+            />
 
-            <div>
-              <label
-                className="mb-1 block text-sm text-ink"
-                htmlFor="project-end"
-              >
-                End date
-              </label>
-              <Input
-                id="project-end"
-                type="date"
-                value={form.endDate}
-                onChange={(event) =>
-                  setForm({ ...form, endDate: event.target.value })
-                }
-              />
-            </div>
+            <DateInput
+              id="project-end"
+              label="End date"
+              value={form.endDate}
+              min={form.startDate || undefined}
+              onChange={(value) => setForm({ ...form, endDate: value })}
+            />
           </div>
 
           <div>

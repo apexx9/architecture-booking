@@ -8,6 +8,7 @@ import EmptyState from "@/components/ui/empty-state";
 import Button from "@/components/ui/button";
 import Dialog from "@/components/ui/dialog";
 import Input from "@/components/ui/input";
+import Select from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { LEAD_STATUSES, getStatusPresentation, toStatusOptions } from "@/lib/domain/status";
 import { getApiErrorMessage } from "@/lib/api/errors";
@@ -225,24 +226,18 @@ const LeadsPage = () => {
                     </div>
 
                     <div className="flex shrink-0 flex-wrap items-center gap-2">
-                      <label className="sr-only" htmlFor={`lead-status-${lead.id}`}>
-                        Status for {lead.name}
-                      </label>
-                      <select
-                        id={`lead-status-${lead.id}`}
+                      <Select
+                        aria-label={`Status for ${lead.name}`}
+                        options={LEAD_STATUS_OPTIONS}
                         value={lead.status}
+                        size="sm"
+                        fullWidth={false}
                         disabled={isBusy}
-                        onChange={(event) =>
-                          updateStatus(lead, event.target.value as Lead["status"])
+                        onChange={(value) =>
+                          updateStatus(lead, value as Lead["status"])
                         }
-                        className="h-8 rounded-sm border border-line bg-surface px-2 pr-8 text-[12px] text-ink disabled:opacity-50 appearance-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink bg-[url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2214%22 height=%2214%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236b6b6b%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpolyline points=%226 9 12 15 18 9%22%3E%3C/polyline%3E%3C/svg%3E')] bg-[right_6px_center] bg-no-repeat"
-                      >
-                        {LEAD_STATUS_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                        className="w-[152px]"
+                      />
 
                       {!lead.convertedToClientId && !isClosed && (
                         <Button

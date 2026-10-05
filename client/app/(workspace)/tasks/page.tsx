@@ -5,9 +5,11 @@ import { ListChecks, Plus } from "lucide-react";
 
 import Button from "@/components/ui/button";
 import Card, { CardBody, CardHeader } from "@/components/ui/card";
+import DateInput from "@/components/ui/date-input";
 import Dialog from "@/components/ui/dialog";
 import EmptyState from "@/components/ui/empty-state";
 import Input from "@/components/ui/input";
+import Select from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import {
@@ -38,6 +40,16 @@ const humanise = (value: string) =>
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+
+const TASK_STATUS_OPTIONS = TASK_STATUSES.map((status) => ({
+  value: status,
+  label: humanise(status),
+}));
+
+const TASK_PRIORITY_OPTIONS = TASK_PRIORITIES.map((priority) => ({
+  value: priority,
+  label: humanise(priority),
+}));
 
 const formatDueDate = (value?: string | null) => {
   if (!value) {
@@ -117,6 +129,16 @@ const TasksPage = () => {
     event.preventDefault();
 
     setFormError(null);
+
+    /*
+     * The native `<select required>` used to block submission in the browser.
+     * A custom listbox cannot carry constraint validation, so the same check
+     * happens here and reports through the form's existing error line.
+     */
+    if (!form.projectId) {
+      setFormError("Select a project.");
+      return;
+    }
 
     const payload: CreateTaskInput = {
       projectId: form.projectId,
@@ -263,25 +285,17 @@ const TasksPage = () => {
                         <Badge tone="neutral">Archived</Badge>
                       ) : (
                         <>
-                          <label className="sr-only" htmlFor={`status-${task.id}`}>
-                            Status for {task.title}
-                          </label>
-                          <select
-                            id={`status-${task.id}`}
+                          <Select
+                            aria-label={`Status for ${task.title}`}
+                            options={TASK_STATUS_OPTIONS}
                             value={task.status}
-                            onChange={(event) =>
-                              advance(task, {
-                                status: event.target.value as TaskStatus,
-                              })
+                            size="sm"
+                            fullWidth={false}
+                            onChange={(value) =>
+                              advance(task, { status: value as TaskStatus })
                             }
-                            className="h-8 rounded-sm border border-line bg-surface px-2 text-[12px] text-ink"
-                          >
-                            {TASK_STATUSES.map((status) => (
-                              <option key={status} value={status}>
-                                {humanise(status)}
-                              </option>
-                            ))}
-                          </select>
+                            className="w-[140px]"
+                          />
 
                           {CLOSED_STATUSES.includes(task.status) && (
                             <button
@@ -312,27 +326,18 @@ const TasksPage = () => {
         title="New Task"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm text-ink" htmlFor="task-project">
-              Project
-            </label>
-            <select
-              id="task-project"
-              value={form.projectId}
-              onChange={(event) =>
-                setForm({ ...form, projectId: event.target.value })
-              }
-              required
-              className="h-10 w-full rounded-sm border border-line bg-surface px-3 text-sm text-ink"
-            >
-              <option value="">Select a project</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            id="task-project"
+            label="Project"
+            placeholder="Select a project"
+            required
+            options={projects.map((project) => ({
+              value: project.id,
+              label: project.name,
+            }))}
+            value={form.projectId}
+            onChange={(value) => setForm({ ...form, projectId: value })}
+          />
 
           <div>
             <label className="mb-1 block text-sm text-ink" htmlFor="task-title">
@@ -365,72 +370,33 @@ const TasksPage = () => {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label
-                className="mb-1 block text-sm text-ink"
-                htmlFor="task-status"
-              >
-                Status
-              </label>
-              <select
-                id="task-status"
-                value={form.status}
-                onChange={(event) =>
-                  setForm({
-                    ...form,
-                    status: event.target.value as TaskStatus,
-                  })
-                }
-                className="h-10 w-full rounded-sm border border-line bg-surface px-3 pr-9 text-sm text-ink appearance-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink bg-[url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236b6b6b%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpolyline points=%226 9 12 15 18 9%22%3E%3C/polyline%3E%3C/svg%3E')] bg-[right_8px_center] bg-no-repeat"
-              >
-                {TASK_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {humanise(status)}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              id="task-status"
+              label="Status"
+              options={TASK_STATUS_OPTIONS}
+              value={form.status}
+              onChange={(value) =>
+                setForm({ ...form, status: value as TaskStatus })
+              }
+            />
 
-            <div>
-              <label
-                className="mb-1 block text-sm text-ink"
-                htmlFor="task-priority"
-              >
-                Priority
-              </label>
-              <select
-                id="task-priority"
-                value={form.priority}
-                onChange={(event) =>
-                  setForm({
-                    ...form,
-                    priority: event.target.value as TaskPriority,
-                  })
-                }
-                className="h-10 w-full rounded-sm border border-line bg-surface px-3 pr-9 text-sm text-ink appearance-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink bg-[url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236b6b6b%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpolyline points=%226 9 12 15 18 9%22%3E%3C/polyline%3E%3C/svg%3E')] bg-[right_8px_center] bg-no-repeat"
-              >
-                {TASK_PRIORITIES.map((priority) => (
-                  <option key={priority} value={priority}>
-                    {humanise(priority)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm text-ink" htmlFor="task-due">
-              Due date
-            </label>
-            <Input
-              id="task-due"
-              type="date"
-              value={form.dueDate}
-              onChange={(event) =>
-                setForm({ ...form, dueDate: event.target.value })
+            <Select
+              id="task-priority"
+              label="Priority"
+              options={TASK_PRIORITY_OPTIONS}
+              value={form.priority}
+              onChange={(value) =>
+                setForm({ ...form, priority: value as TaskPriority })
               }
             />
           </div>
+
+          <DateInput
+            id="task-due"
+            label="Due date"
+            value={form.dueDate}
+            onChange={(value) => setForm({ ...form, dueDate: value })}
+          />
 
           {formError && (
             <p role="alert" className="text-[13px] text-danger">

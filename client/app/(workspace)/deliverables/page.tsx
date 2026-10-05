@@ -6,6 +6,7 @@ import { FileCheck2, Plus, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Button from "@/components/ui/button";
 import Card, { CardBody, CardHeader } from "@/components/ui/card";
+import DateInput from "@/components/ui/date-input";
 import Dialog from "@/components/ui/dialog";
 import EmptyState from "@/components/ui/empty-state";
 import Input from "@/components/ui/input";
@@ -126,6 +127,16 @@ const DeliverablesPage = () => {
     event.preventDefault();
 
     setFormError(null);
+
+    /*
+     * The native `<select required>` used to block submission in the browser.
+     * A custom listbox cannot carry constraint validation, so the same check
+     * happens here and reports through the form's existing error line.
+     */
+    if (!form.projectId) {
+      setFormError("Select a project.");
+      return;
+    }
 
     const payload: CreateDeliverableInput = {
       projectId: form.projectId,
@@ -324,6 +335,8 @@ const DeliverablesPage = () => {
                           aria-label={`Status for ${deliverable.name}`}
                           options={STATUS_OPTIONS}
                           value={deliverable.status}
+                          size="sm"
+                          fullWidth={false}
                           onChange={(value) =>
                             advanceStatus(
                               deliverable,
@@ -389,30 +402,20 @@ const DeliverablesPage = () => {
         title="New Deliverable"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label
-              className="mb-1 block text-sm text-ink"
-              htmlFor="deliverable-project"
-            >
-              Project
-            </label>
-            <select
-              id="deliverable-project"
-              value={form.projectId}
-              onChange={(event) =>
-                setForm({ ...form, projectId: event.target.value, taskId: "" })
-              }
-              required
-              className="h-10 w-full rounded-sm border border-line bg-surface px-3 text-sm text-ink"
-            >
-              <option value="">Select a project</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            id="deliverable-project"
+            label="Project"
+            placeholder="Select a project"
+            required
+            options={projects.map((project) => ({
+              value: project.id,
+              label: project.name,
+            }))}
+            value={form.projectId}
+            onChange={(value) =>
+              setForm({ ...form, projectId: value, taskId: "" })
+            }
+          />
 
           <div>
             <label className="mb-1 block text-sm text-ink" htmlFor="deliverable-name">
@@ -443,76 +446,39 @@ const DeliverablesPage = () => {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label
-                className="mb-1 block text-sm text-ink"
-                htmlFor="deliverable-status"
-              >
-                Status
-              </label>
-              <select
-                id="deliverable-status"
-                value={form.status}
-                onChange={(event) =>
-                  setForm({
-                    ...form,
-                    status: event.target.value as DeliverableStatus,
-                  })
-                }
-                className="h-10 w-full rounded-sm border border-line bg-surface px-3 text-sm text-ink"
-              >
-                {STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label
-                className="mb-1 block text-sm text-ink"
-                htmlFor="deliverable-due"
-              >
-                Due date
-              </label>
-              <Input
-                id="deliverable-due"
-                type="date"
-                value={form.dueDate}
-                onChange={(event) =>
-                  setForm({ ...form, dueDate: event.target.value })
-                }
-              />
-            </div>
-          </div>
-
-          <div>
-            <label
-              className="mb-1 block text-sm text-ink"
-              htmlFor="deliverable-task"
-            >
-              Linked task
-            </label>
-            <select
-              id="deliverable-task"
-              value={form.taskId}
-              onChange={(event) =>
-                setForm({ ...form, taskId: event.target.value })
+            <Select
+              id="deliverable-status"
+              label="Status"
+              options={STATUS_OPTIONS}
+              value={form.status}
+              onChange={(value) =>
+                setForm({ ...form, status: value as DeliverableStatus })
               }
-              disabled={!form.projectId}
-              className="h-10 w-full rounded-sm border border-line bg-surface px-3 text-sm text-ink disabled:opacity-50"
-            >
-              <option value="">
-                {form.projectId ? "None" : "Select a project first"}
-              </option>
-              {projectTasks.map((task) => (
-                <option key={task.id} value={task.id}>
-                  {task.title}
-                </option>
-              ))}
-            </select>
+            />
+
+            <DateInput
+              id="deliverable-due"
+              label="Due date"
+              value={form.dueDate}
+              onChange={(value) => setForm({ ...form, dueDate: value })}
+            />
           </div>
+
+          <Select
+            id="deliverable-task"
+            label="Linked task"
+            placeholder="None"
+            disabled={!form.projectId}
+            hint={
+              form.projectId ? undefined : "Select a project first"
+            }
+            options={projectTasks.map((task) => ({
+              value: task.id,
+              label: task.title,
+            }))}
+            value={form.taskId}
+            onChange={(value) => setForm({ ...form, taskId: value })}
+          />
 
           {formError && (
             <p role="alert" className="text-[13px] text-danger">

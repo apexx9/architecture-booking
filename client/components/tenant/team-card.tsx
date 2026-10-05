@@ -9,6 +9,7 @@ import Card, { CardBody, CardHeader } from "@/components/ui/card";
 import Dialog from "@/components/ui/dialog";
 import EmptyState from "@/components/ui/empty-state";
 import Input from "@/components/ui/input";
+import Select from "@/components/ui/select";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import {
   tenancyApi,
@@ -22,19 +23,22 @@ import {
   type AssignableRole,
 } from "@/schema/tenancy.schema";
 
-const ASSIGNABLE_ROLES: AssignableRole[] = ["ADMIN", "MEMBER", "VIEWER"];
-
 /**
  * Roles a member may hold a selector for. OWNER is absent because the server
  * rejects changes to it and there is no API to transfer ownership, so it is
  * rendered as a static badge instead.
  */
-const EDITABLE_ROLES: TenantRole[] = ["ADMIN", "MEMBER", "VIEWER"];
+const ASSIGNABLE_ROLES: AssignableRole[] = ["ADMIN", "MEMBER", "VIEWER"];
 
 const canManage = (role: CurrentTenant["role"] | undefined) =>
   role === "OWNER" || role === "ADMIN";
 
 const label = (role: string) => role.charAt(0) + role.slice(1).toLowerCase();
+
+const ROLE_OPTIONS = ASSIGNABLE_ROLES.map((role) => ({
+  value: role,
+  label: label(role),
+}));
 
 /**
  * Membership of the current practice: role changes, invitations by email and
@@ -227,27 +231,18 @@ export default function TeamCard() {
                   <span className="flex shrink-0 items-center gap-2">
                     {editable ? (
                       <>
-                        <label
-                          className="sr-only"
-                          htmlFor={`member-role-${member.userId}`}
-                        >
-                          Role for {member.email}
-                        </label>
-                        <select
-                          id={`member-role-${member.userId}`}
+                        <Select
+                          aria-label={`Role for ${member.email}`}
+                          options={ROLE_OPTIONS}
                           value={member.role}
+                          size="sm"
+                          fullWidth={false}
                           disabled={isBusy}
-                          onChange={(event) =>
-                            changeRole(member, event.target.value as TenantRole)
+                          onChange={(value) =>
+                            changeRole(member, value as TenantRole)
                           }
-                          className="h-8 rounded-sm border border-line bg-surface px-2 text-[12px] text-ink disabled:opacity-50"
-                        >
-                          {EDITABLE_ROLES.map((option) => (
-                            <option key={option} value={option}>
-                              {label(option)}
-                            </option>
-                          ))}
-                        </select>
+                          className="w-[112px]"
+                        />
 
                         <Button
                           size="sm"
@@ -299,21 +294,13 @@ export default function TeamCard() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm text-ink" htmlFor="member-role">
-              Role
-            </label>
-            <select
+            <Select
               id="member-role"
+              label="Role"
+              options={ROLE_OPTIONS}
               value={role}
-              onChange={(event) => setRole(event.target.value as AssignableRole)}
-              className="h-10 w-full rounded-sm border border-line bg-surface px-3 text-sm text-ink"
-            >
-              {ASSIGNABLE_ROLES.map((option) => (
-                <option key={option} value={option}>
-                  {label(option)}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setRole(value as AssignableRole)}
+            />
           </div>
 
           <p className="text-[13px] text-ink-subtle">

@@ -215,8 +215,14 @@ body {
 }
 
 /*
- * Custom styling for date inputs - remove default browser styling
- * and provide a clean, custom appearance consistent with design system
+ * Native date and time controls.
+ *
+ * Renove draws its own date UI in `components/ui/date-picker.tsx` — the native
+ * popup cannot be given the design system's geometry and looks different on every
+ * platform. These rules exist so that if a bare `<input type="date">` is ever
+ * added back (a one-off field, a third-party embed), it does not arrive wearing
+ * the browser's default chrome inside an otherwise consistent form. Nothing in
+ * `app/` or `components/` should rely on them.
  */
 input[type="date"],
 input[type="datetime-local"],

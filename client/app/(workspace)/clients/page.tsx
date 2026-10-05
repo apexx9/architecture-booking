@@ -9,6 +9,7 @@ import Card, { CardBody, CardHeader } from "@/components/ui/card";
 import Dialog from "@/components/ui/dialog";
 import EmptyState from "@/components/ui/empty-state";
 import Input from "@/components/ui/input";
+import Select from "@/components/ui/select";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import {
   clientsService,
@@ -18,6 +19,16 @@ import {
 } from "@/services/clients.service";
 
 const CLIENT_STATUSES: ClientStatus[] = ["ACTIVE", "INACTIVE", "ARCHIVED"];
+
+/*
+ * Client statuses are their own vocabulary and are not part of the shared
+ * `AnyStatus` presentation map, so the labels are derived here. The derivation
+ * matches the badges the list already renders for these values.
+ */
+const CLIENT_STATUS_OPTIONS = CLIENT_STATUSES.map((status) => ({
+  value: status,
+  label: status.charAt(0) + status.slice(1).toLowerCase(),
+}));
 
 const STATUS_TONE = {
   ACTIVE: "positive",
@@ -283,30 +294,18 @@ const ClientsPage = () => {
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2">
-                      <label
-                        className="sr-only"
-                        htmlFor={`client-status-${client.id}`}
-                      >
-                        Status for {client.name}
-                      </label>
-                      <select
-                        id={`client-status-${client.id}`}
+                      <Select
+                        aria-label={`Status for ${client.name}`}
+                        options={CLIENT_STATUS_OPTIONS}
                         value={client.status}
+                        size="sm"
+                        fullWidth={false}
                         disabled={isBusy}
-                        onChange={(event) =>
-                          updateStatus(
-                            client,
-                            event.target.value as ClientStatus,
-                          )
+                        onChange={(value) =>
+                          updateStatus(client, value as ClientStatus)
                         }
-                        className="h-8 rounded-sm border border-line bg-surface px-2 text-[12px] text-ink disabled:opacity-50"
-                      >
-                        {CLIENT_STATUSES.map((status) => (
-                          <option key={status} value={status}>
-                            {status.charAt(0) + status.slice(1).toLowerCase()}
-                          </option>
-                        ))}
-                      </select>
+                        className="w-[124px]"
+                      />
 
                       <Button
                         size="sm"
@@ -409,31 +408,18 @@ const ClientsPage = () => {
               />
             </div>
 
-            <div>
-              <label
-                className="mb-1 block text-sm text-ink"
-                htmlFor="client-status"
-              >
-                Status
-              </label>
-              <select
-                id="client-status"
-                value={form.status}
-                onChange={(event) =>
-                  setForm({
-                    ...form,
-                    status: event.target.value as ClientStatus,
-                  })
-                }
-                className="h-10 w-full rounded-sm border border-line bg-surface px-3 text-sm text-ink"
-              >
-                {CLIENT_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {status.charAt(0) + status.slice(1).toLowerCase()}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <Select
+              id="client-status"
+              label="Status"
+              options={CLIENT_STATUS_OPTIONS}
+              value={form.status}
+              onChange={(value) =>
+                setForm({ ...form, status: value as ClientStatus })
+              }
+            />
+          </div>
+
           </div>
 
           <div>

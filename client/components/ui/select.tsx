@@ -43,6 +43,21 @@ export interface SelectProps {
   fullWidth?: boolean;
   id?: string;
   className?: string;
+
+  /**
+   * `md` for form fields, `sm` for controls sitting inline in a list row next to
+   * a button. The panel keeps the same geometry at both sizes — only the trigger
+   * and the rows tighten, so an inline dropdown does not feel like a different
+   * control from the one in the dialog.
+   */
+  size?: "sm" | "md";
+
+  /**
+   * Accessible name for triggers that have no visible label. A field without
+   * one of these two is announced as an unlabelled combobox.
+   */
+  "aria-label"?: string;
+  "aria-labelledby"?: string;
 }
 
 /*
@@ -91,9 +106,13 @@ const Select = ({
   fullWidth = true,
   id,
   className,
+  size = "md",
+  "aria-label": ariaLabel,
+  "aria-labelledby": ariaLabelledBy,
 }: SelectProps) => {
   const generatedId = useId();
   const baseId = id ?? name ?? generatedId;
+  const isCompact = size === "sm";
 
   const triggerId = `${baseId}-trigger`;
   const listboxId = `${baseId}-listbox`;
@@ -124,7 +143,8 @@ const Select = ({
   );
   const selectedOption = selectedIndex >= 0 ? options[selectedIndex] : undefined;
 
-  const willScroll = options.length * OPTION_HEIGHT_PX > PANEL_MAX_HEIGHT_PX;
+  const willScroll =
+    options.length * (isCompact ? 30 : OPTION_HEIGHT_PX) > PANEL_MAX_HEIGHT_PX;
 
   const describedBy =
     [
@@ -367,6 +387,21 @@ const Select = ({
   const showClear =
     clearable && !disabled && currentValue !== undefined && currentValue !== "";
 
+  /*
+   * The chevron and the clear control are taken out of flow and pinned to the
+   * right edge, and the trigger reserves exactly the space they occupy. Laying
+   * them out inline instead would make the gap after the arrow depend on which
+   * controls happen to be rendered, so the same field would sit differently with
+   * and without a clear button — and a long value could run underneath the arrow.
+   */
+  const triggerPadding = isCompact
+    ? showClear
+      ? "py-1.5 pl-3 pr-12"
+      : "py-1.5 pl-3 pr-8"
+    : showClear
+      ? "py-2.5 pl-3.5 pr-16"
+      : "py-2.5 pl-3.5 pr-9";
+
   return (
     <div
       className={[
@@ -393,7 +428,7 @@ const Select = ({
       <div className="relative">
         <div
           className={[
-            "flex w-full items-center gap-2 rounded-sm border bg-surface",
+            "relative flex w-full items-center rounded-sm border bg-surface",
             "transition-colors duration-150 ease-out",
             disabled
               ? "cursor-not-allowed border-line bg-surface-sunken opacity-60"
@@ -421,11 +456,13 @@ const Select = ({
             aria-invalid={error ? true : undefined}
             aria-describedby={describedBy}
             aria-required={required || undefined}
+            aria-label={ariaLabel}
+            aria-labelledby={ariaLabelledBy}
             onClick={() => (isOpen ? close() : open())}
             onKeyDown={handleTriggerKeyDown}
             className={[
-              "flex min-w-0 flex-1 items-center gap-2 px-3.5 py-2.5 text-left",
-              "text-sm",
+              "flex min-w-0 flex-1 items-center text-left text-sm",
+              triggerPadding,
               /*
                * No ring here. The wrapper border turning ink is this field's
                * focus indicator, exactly as in `Input`; a second outline would
@@ -434,6 +471,7 @@ const Select = ({
               "outline-none",
               "disabled:cursor-not-allowed",
               "rounded-sm",
+              isCompact ? "text-[12px]" : "",
             ].join(" ")}
           >
             <span
@@ -444,21 +482,13 @@ const Select = ({
             >
               {selectedOption?.label ?? placeholder}
             </span>
-
-            <ChevronDown
-              aria-hidden="true"
-              className={[
-                "size-4 shrink-0 text-ink-subtle",
-                "transition-transform duration-150 ease-out motion-reduce:transition-none",
-                isOpen ? "rotate-180" : "",
-              ].join(" ")}
-            />
           </button>
 
           {showClear ? (
             <button
               type="button"
               aria-label="Clear selection"
+              tabIndex={-1}
               onClick={() => {
                 if (!isControlled) {
                   setInternalValue(undefined);
@@ -467,26 +497,65 @@ const Select = ({
                 onChange?.("");
                 triggerRef.current?.focus();
               }}
-              className="mr-1.5 shrink-0 cursor-pointer rounded-xs p-1 text-ink-subtle transition-colors duration-150 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+              className={[
+                "absolute top-1/2 -translate-y-1/2 cursor-pointer rounded-xs p-1",
+                "text-ink-subtle transition-colors duration-150 ease-out hover:text-ink",
+                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink",
+                "motion-reduce:transition-none",
+                isCompact ? "right-7" : "right-9",
+              ].join(" ")}
             >
-              <X className="size-3.5" aria-hidden="true" />
+              <X
+                className={isCompact ? "size-3" : "size-3.5"}
+                aria-hidden="true"
+              />
             </button>
           ) : null}
+
+          {/*
+           * Pinned to the right edge and rotating about its own centre, so the
+           * arrow reads as the thing that flipped rather than the whole control.
+           * The easing decelerates into the open state, which is what makes the
+           * panel feel attached to the arrow it came from.
+           */}
+          <ChevronDown
+            aria-hidden="true"
+            className={[
+              "pointer-events-none absolute top-1/2 -translate-y-1/2 shrink-0 text-ink-subtle",
+              "transition-[rotate] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)]",
+              "motion-reduce:transition-none",
+              isCompact ? "right-2.5 size-3.5" : "right-3 size-4",
+              isOpen ? "rotate-180" : "rotate-0",
+            ].join(" ")}
+          />
         </div>
 
         {isOpen ? (
           <div
             ref={panelRef}
             className={[
-              "absolute z-50 w-full overflow-hidden rounded-sm border border-line bg-surface shadow-[0_12px_32px_-16px_rgba(25,25,25,0.35)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-white",
+              /*
+               * The options container is drawn from scratch rather than reusing
+               * the trigger's surface: a hairline border, a single hairline of
+               * highlight along the top edge, and a shadow tight enough to read
+               * as depth rather than as a floating card. `overflow-hidden` plus a
+               * scrolling list keeps rows from painting over the rounded corners.
+               */
+              "absolute z-50 w-full min-w-[11rem] overflow-hidden rounded-sm",
+              "border border-line bg-surface",
+              "shadow-[0_16px_40px_-24px_rgba(25,25,25,0.45)]",
+              "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-white",
               shouldFlip ? "bottom-full mb-1.5" : "top-full mt-1.5",
             ].join(" ")}
           >
             <ul
               id={listboxId}
               role="listbox"
-              aria-label={label}
-              className="relative max-h-72 overflow-y-auto py-1"
+              aria-label={ariaLabel ?? label}
+              className={[
+                "custom-scrollbar relative max-h-72 overflow-y-auto overscroll-contain",
+                isCompact ? "py-1" : "py-1.5",
+              ].join(" ")}
             >
               {options.length === 0 ? (
                 <li className="px-3 py-6 text-center text-[13px] text-ink-subtle">
@@ -514,14 +583,26 @@ const Select = ({
                       }}
                       onClick={() => commit(index)}
                       className={[
-                        "relative flex items-start gap-2.5 px-3 py-2",
-                        "text-[13px] transition-colors duration-150",
+                        "relative flex items-start",
+                        "transition-colors duration-150 ease-out motion-reduce:transition-none",
                         option.disabled
                           ? "cursor-not-allowed opacity-40"
                           : "cursor-pointer",
-                        isActive && !option.disabled
+                        isCompact
+                          ? "gap-2 py-1.5 pl-2.5 pr-3 text-[12px]"
+                          : "gap-2.5 py-2 pl-3 pr-3.5 text-[13px]",
+                        /*
+                         * Two distinct states, deliberately not the same colour:
+                         * `isSelected` is where the value currently is and
+                         * persists after the panel closes, `isActive` is the
+                         * keyboard/pointer cursor and moves on its own. Painting
+                         * them identically makes the current value look like an
+                         * accident of where the pointer last was.
+                         */
+                        isSelected
                           ? "bg-surface-subtle text-ink"
                           : "text-ink-muted hover:bg-surface-subtle hover:text-ink",
+                        isActive && !option.disabled ? "bg-surface-subtle" : "",
                       ].join(" ")}
                     >
                       {/*
@@ -539,11 +620,15 @@ const Select = ({
                       <span
                         aria-hidden="true"
                         className={[
-                          "mt-0.5 flex size-3.5 shrink-0 items-center justify-center",
+                          "flex shrink-0 items-center justify-center",
+                          isCompact ? "mt-px size-3" : "mt-0.5 size-3.5",
                           isSelected ? "text-ink" : "text-transparent",
                         ].join(" ")}
                       >
-                        <Check className="size-3.5" strokeWidth={2.5} />
+                        <Check
+                          className={isCompact ? "size-3" : "size-3.5"}
+                          strokeWidth={2.5}
+                        />
                       </span>
 
                       <span className="min-w-0 flex-1">
@@ -569,14 +654,27 @@ const Select = ({
             </ul>
 
             {/*
-             * Fade hint while more options sit below. Decorative only — the
-             * listbox scrolls and announces its own extent.
+             * Fade hints marking that the list continues. Decorative only — the
+             * listbox scrolls and announces its own extent. Both edges are drawn
+             * because a panel that has been scrolled has content above as well
+             * as below.
              */}
-            {willScroll && !shouldFlip ? (
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-surface to-transparent"
-              />
+            {willScroll ? (
+              <>
+                {!shouldFlip ? (
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-gradient-to-t from-surface to-transparent"
+                  />
+                ) : null}
+
+                {shouldFlip ? (
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-x-0 top-0 h-5 bg-gradient-to-b from-surface to-transparent"
+                  />
+                ) : null}
+              </>
             ) : null}
           </div>
         ) : null}
