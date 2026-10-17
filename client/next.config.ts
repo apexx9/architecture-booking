@@ -22,6 +22,10 @@ const devOrigins = [
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: devOrigins,
+  images: {
+    qualities: [75, 90], // Add 90 to the allowed list
+    // ... other image configs
+  },
 };
 
 export default nextConfig;

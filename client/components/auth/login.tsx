@@ -30,7 +30,7 @@ const Login = () => {
   const searchParams = useSearchParams();
   const formErrorId = useId();
 
-  const { login } = useAuth();
+  const { login, sessionNotice } = useAuth();
   const { savedEmail, save, clear } = useSavedLoginEmail();
 
   // `null` means "untouched", so the field still follows the stored address
@@ -128,6 +128,21 @@ const Login = () => {
             Welcome back to {APP_NAME}.
           </p>
         </div>
+
+        {/*
+          * Being sent here from a session that ended mid-use looks like a stray
+          * redirect without this, and people read that as the app being broken.
+          * Says what happened, and that their place is being kept.
+        */}
+        {sessionNotice === "session-expired" && (
+          <p
+            role="status"
+            className="rounded-sm border border-line bg-surface-subtle px-3 py-2 text-[12px] text-ink sm:text-[13px]"
+          >
+            Your session expired, so you were signed out. Log in again and you
+            will be taken back to where you left off.
+          </p>
+        )}
 
         {oauthError && (
           <p

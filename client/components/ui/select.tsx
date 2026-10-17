@@ -8,9 +8,11 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown, X } from "lucide-react";
 
 import { FieldError, FieldHint } from "@/components/ui/field-error";
+import { useFloatingPanel } from "@/components/ui/use-floating-panel";
 
 export interface SelectOption {
   value: string;
@@ -66,6 +68,12 @@ export interface SelectProps {
  * effect, which is both a lint error and an extra render on every open.
  */
 const OPTION_HEIGHT_PX = 40;
+
+/**
+ * Height of the panel's own cap, the `max-h-72` on the list. Only used to decide
+ * up front whether a list will scroll, so the fade hints can be drawn once
+ * instead of being toggled after a measurement effect.
+ */
 const PANEL_MAX_HEIGHT_PX = 288;
 const TYPEAHEAD_RESET_MS = 500;
 
@@ -87,6 +95,12 @@ function isPrintable(key: string): boolean {
  *
  * Keyboard: Up/Down move, Home/End jump, Enter/Space commit, Escape cancels,
  * Tab closes and continues, and typing jumps to the first matching label.
+ *
+ * The panel is portalled to `document.body` and placed against the viewport,
+ * because a select is most often used inside something that clips: a table row,
+ * a scrolling card, a form in a modal. Rendering the panel inside the field made
+ * it part of that container's scrollable overflow, so opening one could crop the
+ * options, add a scrollbar, or shift the surrounding layout.
  */
 const Select = ({
   label,
@@ -128,15 +142,27 @@ const Select = ({
 
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const [shouldFlip, setShouldFlip] = useState(false);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   const optionRefs = useRef<(HTMLLIElement | null)[]>([]);
   const typeahead = useRef<{ query: string; timer: number | null }>({
     query: "",
     timer: null,
   });
+
+  /*
+   * A select inherits its trigger's width — that alignment is what tells the
+   * user which field the list belongs to — with a floor so options stay readable
+   * when the trigger is an inline control in a table row.
+   */
+  const { panelRef, panelStyle, placement } = useFloatingPanel<HTMLButtonElement>({
+    anchorRef: triggerRef,
+    open: isOpen,
+    matchAnchorWidth: true,
+    minWidth: 176,
+  });
+
+  const shouldFlip = placement === "top";
 
   const selectedIndex = options.findIndex(
     (option) => option.value === currentValue,
@@ -208,22 +234,6 @@ const Select = ({
       return;
     }
 
-    /*
-     * Decide the panel's direction from the trigger's position at the moment it
-     * opens. Doing this here rather than after mount means the first paint is
-     * already in the right place — no flip flash.
-     */
-    const rect = triggerRef.current?.getBoundingClientRect();
-
-    if (rect) {
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
-
-      setShouldFlip(
-        spaceBelow < PANEL_MAX_HEIGHT_PX && spaceAbove > spaceBelow,
-      );
-    }
-
     setActiveIndex(selectedIndex >= 0 ? selectedIndex : firstEnabled());
     setIsOpen(true);
   }, [disabled, options.length, selectedIndex, firstEnabled]);
@@ -273,7 +283,7 @@ const Select = ({
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("touchstart", handlePointerDown);
     };
-  }, [isOpen]);
+  }, [isOpen, panelRef, triggerRef]);
 
   const runTypeahead = useCallback(
     (key: string) => {
@@ -425,23 +435,26 @@ const Select = ({
         </p>
       ) : null}
 
-      <div className="relative">
-        <div
-          className={[
-            "relative flex w-full items-center rounded-sm border bg-surface",
-            "transition-colors duration-150 ease-out",
-            disabled
-              ? "cursor-not-allowed border-line bg-surface-sunken opacity-60"
-              : error
-                ? "border-danger focus-within:border-danger"
-                : isOpen
-                  ? "border-ink"
-                  : "border-line hover:border-line-strong focus-within:border-ink",
-          ].join(" ")}
-        >
-          <button
-            ref={triggerRef}
-            id={triggerId}
+      {/*
+       * `relative` stays here for the clear button and the chevron, which are
+       * pinned to the trigger's own edges. The panel no longer lives in here.
+       */}
+      <div
+        className={[
+          "relative flex w-full items-center rounded-sm border bg-surface",
+          "transition-colors duration-150 ease-out",
+          disabled
+            ? "cursor-not-allowed border-line bg-surface-sunken opacity-60"
+            : error
+              ? "border-danger focus-within:border-danger"
+              : isOpen
+                ? "border-ink"
+                : "border-line hover:border-line-strong focus-within:border-ink",
+        ].join(" ")}
+      >
+        <button
+          ref={triggerRef}
+          id={triggerId}
             type="button"
             role="combobox"
             disabled={disabled}
@@ -528,27 +541,33 @@ const Select = ({
               isOpen ? "rotate-180" : "rotate-0",
             ].join(" ")}
           />
-        </div>
+      </div>
 
-        {isOpen ? (
-          <div
-            ref={panelRef}
-            className={[
-              /*
-               * The options container is drawn from scratch rather than reusing
-               * the trigger's surface: a hairline border, a single hairline of
-               * highlight along the top edge, and a shadow tight enough to read
-               * as depth rather than as a floating card. `overflow-hidden` plus a
-               * scrolling list keeps rows from painting over the rounded corners.
-               */
-              "absolute z-50 w-full min-w-[11rem] overflow-hidden rounded-sm",
-              "border border-line bg-surface",
-              "shadow-[0_16px_40px_-24px_rgba(25,25,25,0.45)]",
-              "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-white",
-              shouldFlip ? "bottom-full mb-1.5" : "top-full mt-1.5",
-            ].join(" ")}
-          >
-            <ul
+      {isOpen
+        ? createPortal(
+            <div
+              ref={panelRef}
+              style={panelStyle}
+              className={[
+                /*
+                 * The options container is drawn from scratch rather than reusing
+                 * the trigger's surface: a hairline border, a single hairline of
+                 * highlight along the top edge, and a shadow tight enough to read
+                 * as depth rather than as a floating card. `overflow-hidden` plus a
+                 * scrolling list keeps rows from painting over the rounded corners.
+                 *
+                 * `relative` is load-bearing for the highlight and the scroll
+                 * fades below; the coordinates come from `panelStyle`, because the
+                 * panel is in `document.body` and cannot be placed relative to
+                 * this trigger.
+                 */
+                "relative z-50 overflow-hidden rounded-sm",
+                "border border-line bg-surface",
+                "shadow-[0_16px_40px_-24px_rgba(25,25,25,0.45)]",
+                "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-white",
+              ].join(" ")}
+            >
+              <ul
               id={listboxId}
               role="listbox"
               aria-label={ariaLabel ?? label}
@@ -661,24 +680,23 @@ const Select = ({
              */}
             {willScroll ? (
               <>
-                {!shouldFlip ? (
-                  <span
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-gradient-to-t from-surface to-transparent"
-                  />
-                ) : null}
-
                 {shouldFlip ? (
                   <span
                     aria-hidden="true"
                     className="pointer-events-none absolute inset-x-0 top-0 h-5 bg-gradient-to-b from-surface to-transparent"
                   />
-                ) : null}
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-gradient-to-t from-surface to-transparent"
+                  />
+                )}
               </>
             ) : null}
-          </div>
-        ) : null}
-      </div>
+          </div>,
+          document.body,
+        )
+        : null}
 
       {name ? (
         <input type="hidden" name={name} value={currentValue ?? ""} />

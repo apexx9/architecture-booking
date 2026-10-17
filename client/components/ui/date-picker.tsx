@@ -9,7 +9,10 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+
+import { useFloatingPanel } from "@/components/ui/use-floating-panel";
 
 export type DateValue = string;
 
@@ -81,7 +84,6 @@ const WEEKDAY_FULL = [
 
 const DAYS_PER_WEEK = 7;
 const GRID_CELLS = 42;
-const PANEL_MAX_HEIGHT_PX = 340;
 
 /*
  * Dates are built at local noon rather than midnight. A date-only field has no
@@ -226,11 +228,22 @@ const DatePicker = ({
   const [activeDate, setActiveDate] = useState<Date>(
     () => selectedDate ?? today,
   );
-  const [shouldFlip, setShouldFlip] = useState(false);
-
   const wrapperRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+
+  /*
+   * The calendar is portalled and placed against the viewport, for the same
+   * reason the select panel is: date fields sit inside clipped containers —
+   * table rows, scrolling cards, modals — and an in-flow panel was part of their
+   * scrollable overflow.
+   */
+  const { panelRef, panelStyle } = useFloatingPanel<HTMLButtonElement>({
+    anchorRef: triggerRef,
+    open: isOpen,
+    align: "start",
+    minWidth: 312,
+  });
 
   const panelId = `${baseId}-calendar`;
   const gridId = `${baseId}-grid`;
@@ -266,24 +279,12 @@ const DatePicker = ({
       return;
     }
 
-    /*
-     * Choose the opening month from the trigger's position, before the panel
-     * mounts, so the first paint is already on the correct side and does not
-     * flash downwards and then jump upwards.
-     */
+    // The opening month follows the current value, not the panel's direction;
+    // which way the panel opens is decided by the measured fit.
     const anchor = selectedDate ?? today;
-    const rect = triggerRef.current?.getBoundingClientRect();
 
     setViewDate(anchor);
     setActiveDate(anchor);
-
-    if (rect) {
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
-
-      setShouldFlip(spaceBelow < PANEL_MAX_HEIGHT_PX && spaceAbove > spaceBelow);
-    }
-
     setIsOpen(true);
   }, [disabled, selectedDate, today]);
 
@@ -320,7 +321,7 @@ const DatePicker = ({
     if (isOpen) {
       gridRef.current?.focus();
     }
-  }, [isOpen]);
+  }, [isOpen, panelRef]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -328,7 +329,12 @@ const DatePicker = ({
     }
 
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
-      if (wrapperRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+
+      if (
+        wrapperRef.current?.contains(target) ||
+        panelRef.current?.contains(target)
+      ) {
         return;
       }
 
@@ -342,7 +348,7 @@ const DatePicker = ({
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("touchstart", handlePointerDown);
     };
-  }, [isOpen]);
+  }, [isOpen, panelRef]);
 
   /*
    * Every keyboard action ends here: move the cursor, and if that leaves the
@@ -561,18 +567,25 @@ const DatePicker = ({
         ) : null}
       </div>
 
-      {isOpen ? (
-        <div
-          id={panelId}
-          role="dialog"
-          aria-label="Choose a date"
-          className={[
-            "absolute z-50 w-[19.5rem] max-w-[calc(100vw-2rem)] rounded-sm border border-line bg-surface p-3",
-            "shadow-[0_16px_40px_-24px_rgba(25,25,25,0.45)]",
-            "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-white",
-            shouldFlip ? "bottom-full mb-1.5" : "top-full mt-1.5",
-          ].join(" ")}
-        >
+      {isOpen
+        ? createPortal(
+            <div
+              ref={panelRef}
+              id={panelId}
+              style={panelStyle}
+              role="dialog"
+              aria-label="Choose a date"
+              className={[
+                /*
+                 * `relative` keeps the highlight hairline anchored to the panel;
+                 * the coordinates come from `panelStyle` because this lives in
+                 * `document.body` rather than beside the trigger.
+                 */
+                "relative z-50 w-[19.5rem] rounded-sm border border-line bg-surface p-3",
+                "shadow-[0_16px_40px_-24px_rgba(25,25,25,0.45)]",
+                "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-white",
+              ].join(" ")}
+            >
           <div className="flex items-center justify-between gap-2">
             <button
               type="button"
@@ -698,18 +711,20 @@ const DatePicker = ({
               Today
             </button>
 
-            {showClear ? (
-              <button
-                type="button"
-                onClick={clear}
-                className="cursor-pointer rounded-xs px-1.5 py-1 text-[12px] text-ink-muted transition-colors duration-150 ease-out hover:bg-surface-subtle hover:text-ink motion-reduce:transition-none"
-              >
-                Clear
-              </button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+              {showClear ? (
+                <button
+                  type="button"
+                  onClick={clear}
+                  className="cursor-pointer rounded-xs px-1.5 py-1 text-[12px] text-ink-muted transition-colors duration-150 ease-out hover:bg-surface-subtle hover:text-ink motion-reduce:transition-none"
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
+          </div>,
+          document.body,
+        )
+        : null}
 
       {name ? <input type="hidden" name={name} value={currentValue ?? ""} /> : null}
     </div>

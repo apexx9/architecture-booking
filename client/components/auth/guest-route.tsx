@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/hooks/use-auth";
 import { sanitizeNextPath } from "@/lib/auth/redirect";
-import AuthPending from "@/components/auth/auth-pending";
 
 interface GuestRouteProps {
   children: ReactNode;
@@ -30,13 +29,21 @@ export function GuestRoute({ children }: GuestRouteProps) {
     router.replace(destination);
   }, [isLoading, isAuthenticated, router]);
 
-  if (isLoading) {
-    return <AuthPending />;
-  }
-
+  /*
+   * A confirmed session means the redirect above is already under way, so the
+   * form is blanked to avoid flashing sign-in at someone who is on their way
+   * back to the workspace.
+   */
   if (isAuthenticated) {
-    return <AuthPending />;
+    return <div className="min-h-dvh bg-background" aria-hidden="true" />;
   }
 
+  /*
+   * These routes are public, so they render while the session check is still
+   * running. Holding every visitor — including the vast majority who are simply
+   * not signed in — on a full-screen session check before they can even see the
+   * form is the worse trade, and the check that follows is what decides whether
+   * a redirect is needed at all.
+   */
   return children;
 }

@@ -3,16 +3,27 @@ import type { AuthUser, TenantSummary } from "@/actions/auth";
 
 export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
+/**
+ * Why the app dropped a session it previously held, so the sign-in screen can
+ * explain the interruption instead of looking like a stray redirect. Set only by
+ * a session that was lost while in use — never by a user who simply never signed
+ * in — and cleared by a successful sign-in.
+ */
+export type SessionNotice = "session-expired";
+
 interface AuthState {
   status: AuthStatus;
   user: AuthUser | null;
   tenants: TenantSummary[];
   activeTenantId: string | null;
+  sessionNotice: SessionNotice | null;
 
   setLoading: () => void;
   setAuthenticated: (user: AuthUser) => void;
   setUnauthenticated: () => void;
-  clearAuth: () => void;
+  /** Drops the session, optionally recording why so sign-in can mention it. */
+  clearAuth: (notice?: SessionNotice) => void;
+  clearSessionNotice: () => void;
 
   /** Replaces the whole list. Also accepts an updater, for adding or removing one. */
   setTenants: (tenants: TenantSummary[] | ((previous: TenantSummary[]) => TenantSummary[])) => void;
@@ -26,6 +37,7 @@ const useAuthStore = create<AuthState>((set) => ({
   user: null,
   tenants: EMPTY_TENANTS,
   activeTenantId: null,
+  sessionNotice: null,
 
   setLoading: () => {
     set({
@@ -37,6 +49,7 @@ const useAuthStore = create<AuthState>((set) => ({
     set({
       status: "authenticated",
       user,
+      sessionNotice: null,
     });
   },
 
@@ -49,16 +62,23 @@ const useAuthStore = create<AuthState>((set) => ({
     });
   },
 
-  clearAuth: () => {
+  clearAuth: (notice) => {
     set({
       status: "unauthenticated",
       user: null,
       tenants: EMPTY_TENANTS,
       activeTenantId: null,
+      sessionNotice: notice ?? null,
     });
   },
 
-setTenants: (tenants) => {
+  clearSessionNotice: () => {
+    set({
+      sessionNotice: null,
+    });
+  },
+
+  setTenants: (tenants) => {
       set((state) => {
         const next =
           typeof tenants === "function" ? tenants(state.tenants) : tenants;

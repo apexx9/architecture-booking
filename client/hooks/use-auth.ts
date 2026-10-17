@@ -7,10 +7,12 @@ import { authService } from "@/services/auth.service";
 export function useAuth() {
   const status = useAuthStore((state) => state.status);
   const user = useAuthStore((state) => state.user);
+  const sessionNotice = useAuthStore((state) => state.sessionNotice);
 
   return {
     status,
     user,
+    sessionNotice,
 
     isLoading: status === "loading",
     isAuthenticated: status === "authenticated",

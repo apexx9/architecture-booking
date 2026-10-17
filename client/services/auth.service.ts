@@ -1,4 +1,5 @@
 import { authApi, type AuthUser, type LoginResponse } from "@/actions/auth";
+import { broadcastSessionEvent } from "@/lib/auth/session-events";
 
 import type {
   ForgotPasswordInput,
@@ -61,6 +62,13 @@ export const authService = {
     try {
       await authApi.logout();
     } finally {
+      /*
+       * Signing out ends the session for the whole browser, because the cookies
+       * are shared. The other tabs have to hear about it, or they keep showing a
+       * workspace that no longer has a session behind it until something happens
+       * to request a data call.
+       */
+      broadcastSessionEvent({ type: "signed-out" });
       useAuthStore.getState().clearAuth();
     }
   },
@@ -69,6 +77,7 @@ export const authService = {
     try {
       await authApi.logoutAll();
     } finally {
+      broadcastSessionEvent({ type: "signed-out" });
       useAuthStore.getState().clearAuth();
     }
   },

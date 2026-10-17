@@ -24,12 +24,25 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     }
   }, [isLoading, isAuthenticated, router]);
 
+  /*
+   * The session is still being established, so the answer is genuinely unknown
+   * and a quiet screen is honest about that.
+   */
   if (isLoading) {
     return <AuthPending />;
   }
 
+  /*
+   * The answer is known and it is no — the redirect above is already on its way.
+   * Showing the pending screen here would announce a session check that has
+   * already finished, which reads as the app being stuck rather than as being
+   * sent to sign in.
+   *
+   * The surface is kept, and the page background is preserved, so the handover
+   * does not flash white before the sign-in page arrives.
+   */
   if (!isAuthenticated) {
-    return <AuthPending />;
+    return <div className="min-h-dvh bg-background" aria-hidden="true" />;
   }
 
   return children;
