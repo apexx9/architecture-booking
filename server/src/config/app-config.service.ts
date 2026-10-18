@@ -122,10 +122,19 @@ export class AppConfigService {
   }
 
   get googleCallbackUrl(): string {
-    return (
-      this.configService.get<string>('GOOGLE_CALLBACK_URL') ||
-      `${this.frontendUrl}/auth/google/callback`
-    );
+    const configured = this.configService
+      .get<string>('GOOGLE_CALLBACK_URL')
+      ?.trim();
+
+    if (configured) {
+      return configured;
+    }
+
+    // In production, the OAuth provider returns through the public same-domain
+    // /api route; the service-scoped Vercel rewrite strips /api before NestJS.
+    return this.isProduction
+      ? `${this.frontendBaseUrl}/api/auth/google/callback`
+      : 'http://localhost:8000/auth/google/callback';
   }
 
   get microsoftClientId(): string | undefined {
@@ -137,10 +146,19 @@ export class AppConfigService {
   }
 
   get microsoftCallbackUrl(): string {
-    return (
-      this.configService.get<string>('MICROSOFT_CALLBACK_URL') ||
-      `${this.frontendUrl}/auth/microsoft/callback`
-    );
+    const configured = this.configService
+      .get<string>('MICROSOFT_CALLBACK_URL')
+      ?.trim();
+
+    if (configured) {
+      return configured;
+    }
+
+    // In production, the OAuth provider returns through the public same-domain
+    // /api route; the service-scoped Vercel rewrite strips /api before NestJS.
+    return this.isProduction
+      ? `${this.frontendBaseUrl}/api/auth/microsoft/callback`
+      : 'http://localhost:8000/auth/microsoft/callback';
   }
 
   get microsoftTenantId(): string {
