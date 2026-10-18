@@ -11,6 +11,9 @@ const logger = new Logger('CORS');
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Public API requests are mounted under /api by the Vercel service router.
+  app.setGlobalPrefix('api');
+
   app.useGlobalFilters(new AllExceptionsFilter());
 
   app.use(cookieParser());

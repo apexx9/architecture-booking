@@ -8,13 +8,7 @@
     "server": {
       "root": "server",
       "runtime": "container",
-      "entrypoint": "Dockerfile.vercel",
-      "rewrites": [
-        {
-          "source": "/api/:path(.*)?",
-          "destination": "/:path"
-        }
-      ]
+      "entrypoint": "Dockerfile.vercel"
     }
   },
   "rewrites": [

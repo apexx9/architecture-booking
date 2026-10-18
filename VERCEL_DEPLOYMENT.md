@@ -12,10 +12,10 @@ The root `vercel.json` defines two services:
 - `client` builds the Next.js app from `client/`.
 - `server` builds the NestJS API from `server/Dockerfile.vercel` as a container.
 
-Public requests to `/api/*` are routed to `server`. A service-scoped rewrite
-removes the `/api` prefix before the request reaches NestJS, so existing
-controller paths such as `/auth/csrf` remain unchanged. All other public paths
-go to the Next.js frontend. No service bindings are required for this topology.
+Public requests to `/api/*` are routed to `server`, and NestJS applies the same
+`/api` global prefix. For example, the public `/api/auth/csrf` endpoint maps to
+the `AuthController` route `/auth/csrf` under that prefix. All other public
+paths go to the Next.js frontend. No service bindings are required for this topology.
 
 The container listens on port 80 by default. The Docker image sets `PORT=80`,
 and the platform can override `PORT` through the service's environment.
