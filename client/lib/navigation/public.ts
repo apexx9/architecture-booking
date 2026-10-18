@@ -6,6 +6,6 @@ export interface PublicNavLink {
 
 export const PUBLIC_NAV_LINKS: PublicNavLink[] = [
   { name: "Overview", href: "/" },
+  { name: "The workspace", href: "/#product" },
   { name: "How it works", href: "/#workflow" },
-  { name: "Who it's for", href: "/#for-practices" },
 ];
