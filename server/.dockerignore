@@ -1,0 +1,17 @@
+# Keep local and generated files out of the container build context.
+node_modules
+dist
+coverage
+.nyc_output
+*.log
+
+# Never copy secrets into an image.
+.env
+.env.*
+!.env.example
+
+# Repository metadata and local tooling.
+.git
+.github
+.vercel
+.DS_Store
