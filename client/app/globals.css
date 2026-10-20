@@ -262,3 +262,430 @@ input[type="datetime-local"]::-moz-focus-inner,
 input[type="time"]::-moz-focus-inner {
   border: 0;
 }
+
+
+/* --------------------------------------------------------------------------
+   Archion-inspired Renove landing page
+   Keep this stylesheet scoped to .archion-home so the application UI remains
+   unchanged. The structure and motion follow the supplied reference HTML.
+   -------------------------------------------------------------------------- */
+.archion-home {
+  --archion-ink: #000;
+  --archion-accent: #f94e41;
+  --archion-gray: #acacac;
+  --archion-border: #d4d4d4;
+  color: var(--archion-ink);
+  background: #fff;
+  font-family: var(--font-sans), sans-serif;
+  overflow: clip;
+}
+.archion-home a { color: inherit; text-decoration: none; transition: color .3s ease; }
+.archion-home a:hover { color: var(--archion-accent); }
+.archion-home img { display: block; }
+.archion-home h1,
+.archion-home h2,
+.archion-home h3,
+.archion-home p { margin-top: 0; }
+.archion-kicker {
+  margin: 0 0 22px;
+  color: #777;
+  font-size: 10px;
+  line-height: 1.5;
+  letter-spacing: .17em;
+  text-transform: uppercase;
+}
+.archion-desktop-header {
+  position: absolute;
+  z-index: 30;
+  top: 0;
+  left: 0;
+  display: flex;
+  width: 100%;
+  height: 400px;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px 40px 0;
+  color: #fff;
+}
+.archion-wordmark {
+  display: inline-flex;
+  align-items: center;
+  min-height: 80px;
+  color: #fff !important;
+  font-size: 35px;
+  font-weight: 500;
+  letter-spacing: -.085em;
+  line-height: 1;
+}
+.archion-wordmark span { color: var(--archion-accent); }
+.archion-header-right {
+  display: flex;
+  width: 50%;
+  height: calc(100% - 66px);
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-top: 46px;
+  padding: 24px 0 0 28px;
+  border-top: 1px solid rgba(255,255,255,.51);
+}
+.archion-header-note {
+  max-width: 240px;
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.archion-header-note svg { display: inline; margin-left: 5px; }
+.archion-nav { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+.archion-nav a {
+  display: inline-block;
+  color: #fff !important;
+  font-size: 17px;
+  line-height: 1.55;
+  letter-spacing: -.025em;
+  text-transform: uppercase;
+  background-image: linear-gradient(to top, currentColor 1px, transparent 1px);
+  background-repeat: no-repeat;
+  background-size: 0 100%;
+  background-position-x: 100%;
+  transition: background-size .35s cubic-bezier(.16,.48,.36,1);
+}
+.archion-nav a:hover,
+.archion-nav a[aria-current="page"] { background-size: 100% 100%; background-position-x: 0; }
+.archion-mobile-header,
+.archion-mobile-nav { display: none; }
+.archion-hero {
+  position: relative;
+  height: 100svh;
+  min-height: 640px;
+  overflow: hidden;
+  background: #111;
+  color: #fff;
+}
+.archion-slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 5.2vw;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 1.2s ease, visibility 1.2s;
+}
+.archion-slide.is-active { opacity: 1; visibility: visible; }
+.archion-slide-image { z-index: 0; object-fit: cover; transition: transform 7s ease; }
+.archion-slide.is-active .archion-slide-image { transform: scale(1.055); }
+.archion-slide-shade {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,.32), rgba(0,0,0,.38));
+}
+.archion-slide-copy { position: relative; z-index: 2; padding-top: 70px; }
+.archion-slide-subtitle {
+  max-width: 520px;
+  margin: 0 0 45px;
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.6;
+  opacity: 0;
+  transform: translateX(40px);
+  transition: opacity .6s ease, transform .8s cubic-bezier(.26,-.14,0,1.01);
+}
+.archion-slide-title {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(60px, 10vw, 151px);
+  font-weight: 400;
+  line-height: .91;
+  letter-spacing: -.055em;
+  text-transform: uppercase;
+}
+.archion-slide-title span {
+  display: block;
+  opacity: 0;
+  transform: translateX(48px);
+  transition: opacity .65s ease, transform 1s cubic-bezier(.26,-.14,0,1.01);
+  transition-delay: calc(.2s + var(--line-index, 0) * .2s);
+}
+.archion-slide.is-active .archion-slide-title span,
+.archion-slide.is-active .archion-slide-subtitle { opacity: 1; transform: translateX(0); }
+.archion-slide.is-active .archion-slide-subtitle { transition-delay: .75s; }
+.archion-hero-bullets {
+  position: absolute;
+  z-index: 5;
+  bottom: 58px;
+  left: 5.2vw;
+  display: flex;
+  gap: 18px;
+}
+.archion-hero-bullet {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 1px solid #fff;
+  background: transparent;
+  cursor: pointer;
+  transition: background .25s ease;
+}
+.archion-hero-bullet.is-active,
+.archion-hero-bullet:hover { background: #fff; }
+.archion-hero-index {
+  position: absolute;
+  right: 5.2vw;
+  bottom: 56px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255,255,255,.75);
+  font-size: 11px;
+  letter-spacing: .1em;
+}
+.archion-hero-index span { color: #fff; }
+.archion-hero-index i { width: 35px; height: 1px; background: rgba(255,255,255,.6); }
+.archion-scroll-cue {
+  position: absolute;
+  z-index: 5;
+  right: 5.2vw;
+  bottom: 100px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #fff !important;
+  font-size: 9px;
+  letter-spacing: .14em;
+}
+.archion-scroll-cue svg { display: inline; }
+.archion-intro { padding: 124px 5.2vw 0; }
+.archion-intro h2 {
+  max-width: 1000px;
+  margin: 0;
+  font-size: clamp(30px, 4.1vw, 58px);
+  font-weight: 400;
+  line-height: 1.12;
+  letter-spacing: -.05em;
+}
+.archion-services {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 34px;
+  padding: 110px 5.2vw 120px;
+}
+.archion-service { display: flex; flex-direction: column; align-items: flex-start; }
+.archion-service-icon { width: 78px; height: 78px; margin-bottom: 28px; color: #171717; }
+.archion-service-number { margin: 0 0 12px; color: #777; font-size: 9px; letter-spacing: .14em; }
+.archion-service h3 { margin: 0 0 10px; font-size: clamp(24px, 2.3vw, 32px); font-weight: 400; line-height: 1.14; letter-spacing: -.045em; }
+.archion-service > p:last-child { max-width: 390px; margin: 0; color: #555; font-size: 14px; line-height: 1.8; }
+.archion-product-section { padding: 90px 5.2vw 110px; background: #f7f6f3; }
+.archion-product-heading {
+  display: grid;
+  grid-template-columns: 1.1fr .9fr;
+  gap: 50px;
+  align-items: end;
+  margin-bottom: 50px;
+}
+.archion-product-heading h2,
+.archion-portfolio-heading h2 {
+  max-width: 660px;
+  margin: 0;
+  font-size: clamp(36px, 5vw, 66px);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -.055em;
+}
+.archion-product-heading > p { max-width: 470px; margin: 0 0 3px; color: #5d5d5d; font-size: 15px; line-height: 1.8; }
+.archion-product-grid { display: grid; grid-template-columns: .9fr 1.1fr; align-items: stretch; gap: 28px; }
+.archion-product-image { position: relative; min-height: 560px; overflow: hidden; background: #ddd9d0; }
+.archion-product-image > img { object-fit: cover; transition: transform .8s cubic-bezier(.33,.02,0,.93); }
+.archion-product-image:hover > img { transform: scale(1.035); }
+.archion-product-image > span {
+  position: absolute;
+  z-index: 1;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 25px;
+  color: #fff;
+  background: linear-gradient(transparent, rgba(0,0,0,.55));
+  font-size: 12px;
+  letter-spacing: .04em;
+}
+.archion-workspace { align-self: center; border: 1px solid rgba(0,0,0,.14); background: #fbfaf8; box-shadow: 0 22px 70px rgba(0,0,0,.07); }
+.archion-workspace-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 17px 20px; border-bottom: 1px solid rgba(0,0,0,.1); background: #fff; }
+.archion-preview-label { border: 1px solid #ddd; padding: 5px 7px; color: #555; font-size: 8px; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; }
+.archion-workspace-body { padding: 25px; }
+.archion-workspace-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
+.archion-workspace-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 24px; }
+.archion-workspace-stats > div { display: flex; min-height: 110px; flex-direction: column; align-items: flex-start; padding: 12px; border: 1px solid #e7e5e1; background: #fff; }
+.archion-workspace-stats span { color: #656565; font-size: 10px; line-height: 1.4; }
+.archion-workspace-stats strong { margin-top: auto; padding-top: 13px; font-size: 23px; font-weight: 400; letter-spacing: -.04em; }
+.archion-workspace-stats small { margin-top: 4px; color: #888; font-size: 9px; line-height: 1.4; }
+.archion-workspace-rows { margin-top: 14px; border: 1px solid #e7e5e1; background: #fff; }
+.archion-workspace-row { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-bottom: 1px solid #ecebe8; }
+.archion-workspace-row:last-child { border-bottom: 0; }
+.archion-workspace-row > svg { flex-shrink: 0; color: #777; }
+.archion-workspace-row > div { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
+.archion-workspace-row strong { font-size: 11px; font-weight: 500; }
+.archion-workspace-row small { color: #777; font-size: 10px; }
+.archion-workspace-row > span { border: 1px solid #e7e5e1; padding: 3px 7px; color: #666; font-size: 10px; }
+.archion-workspace-note { margin: 0; padding: 11px 20px; border-top: 1px solid rgba(0,0,0,.1); background: #fff; color: #777; font-size: 9px; line-height: 1.6; }
+.archion-portfolio { padding: 95px 5.2vw 90px; }
+.archion-portfolio-heading { margin-bottom: 45px; }
+.archion-portfolio-heading h2 { max-width: 780px; }
+.archion-feature { border-top: 1px solid var(--archion-border); }
+.archion-feature:last-child { border-bottom: 1px solid var(--archion-border); }
+.archion-feature-header {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 55px minmax(0, 1fr) minmax(180px, .65fr) 24px;
+  align-items: center;
+  gap: 15px;
+  padding: 22px 28px;
+  border: 0;
+  background: transparent;
+  color: #000;
+  text-align: left;
+  cursor: pointer;
+  transition: background .25s ease;
+}
+.archion-feature-header:hover { background: #f8f8f7; }
+.archion-feature-number { color: #777; font-size: 10px; letter-spacing: .12em; }
+.archion-feature-title { font-size: clamp(19px, 2.3vw, 30px); font-weight: 400; letter-spacing: -.04em; }
+.archion-feature-meta { color: #666; font-size: 13px; }
+.archion-feature-arrow { display: flex; justify-content: flex-end; transition: transform .35s ease; }
+.archion-feature.is-open .archion-feature-arrow { transform: rotate(180deg); }
+.archion-feature-panel { display: grid; grid-template-rows: 0fr; border-top: 0 solid var(--archion-border); transition: grid-template-rows .55s ease, border-color .3s; }
+.archion-feature.is-open .archion-feature-panel { grid-template-rows: 1fr; border-top-width: 1px; }
+.archion-feature-panel-inner { min-height: 0; overflow: hidden; }
+.archion-feature-copy { display: grid; grid-template-columns: .55fr 1.2fr .5fr; align-items: start; gap: 28px; padding: 24px 28px 25px; }
+.archion-feature-copy .archion-kicker { margin: 4px 0 0; }
+.archion-feature-copy > p:nth-child(2) { max-width: 620px; margin: 0; color: #555; font-size: 14px; line-height: 1.8; }
+.archion-feature-copy a { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.archion-feature-gallery { display: flex; gap: 22px; overflow-x: auto; padding: 0 28px 30px; scrollbar-width: thin; }
+.archion-feature-gallery button { position: relative; display: block; flex: 0 0 auto; width: clamp(220px, 29vw, 380px); padding: 0; overflow: hidden; border: 0; background: #eee; cursor: zoom-in; text-align: left; }
+.archion-feature-gallery img { width: 100%; height: 245px; object-fit: cover; transition: transform .6s cubic-bezier(.33,.02,0,.93); }
+.archion-feature-gallery button:hover img { transform: scale(1.04); }
+.archion-feature-gallery button > span { position: absolute; right: 10px; bottom: 10px; color: #fff; font-size: 10px; text-shadow: 0 1px 8px #000; }
+.archion-big-banner { position: relative; min-height: 550px; display: flex; align-items: center; overflow: hidden; margin-top: 12px; padding: 120px 5.2vw; background: #222; color: #fff; }
+.archion-big-banner > img { object-fit: cover; transition: transform 1.2s ease; }
+.archion-big-banner:hover > img { transform: scale(1.025); }
+.archion-banner-shade { position: absolute; inset: 0; background: rgba(0,0,0,.43); }
+.archion-banner-copy { position: relative; z-index: 1; color: #fff; font-size: clamp(42px, 8vw, 100px); font-weight: 400; line-height: .98; letter-spacing: -.055em; text-transform: uppercase; }
+.archion-banner-copy p { margin: 0 0 35px; color: rgba(255,255,255,.8); font-size: 10px; line-height: 1.5; letter-spacing: .17em; }
+.archion-banner-copy span { display: block; }
+.archion-footer { padding: 90px 5.2vw 55px; background: #fff; }
+.archion-footer-grid { position: relative; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 35px; }
+.archion-footer-col { display: flex; flex-direction: column; align-items: flex-start; gap: 13px; padding-right: 25px; }
+.archion-footer-col + .archion-footer-col { padding-left: 28px; border-left: 1px solid rgba(112,112,112,.3); }
+.archion-footer-col h2 { max-width: 520px; margin: 0 0 15px; font-size: clamp(34px, 4vw, 58px); font-weight: 400; line-height: 1.04; letter-spacing: -.055em; }
+.archion-footer-col h3 { margin: 0 0 12px; font-size: 17px; font-weight: 400; letter-spacing: .02em; }
+.archion-footer-col p:not(.archion-kicker) { max-width: 340px; margin: 0 0 8px; color: #666; font-size: 13px; line-height: 1.8; }
+.archion-footer-col > a:not(:has(button)) { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.archion-footer-col .archion-kicker { margin-bottom: 12px; }
+.archion-footer-subtitle { margin-top: 10px !important; }
+.archion-copyright { margin-top: auto !important; padding-top: 35px; font-size: 11px !important; }
+.archion-lightbox { position: fixed; z-index: 1000; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 15px; padding: 30px; background: rgba(0,0,0,.94); cursor: zoom-out; }
+.archion-lightbox > img { max-width: 95vw; max-height: 86vh; width: auto; height: auto; object-fit: contain; cursor: default; }
+.archion-lightbox > span { max-width: 90vw; color: #fff; font-size: 12px; text-align: center; }
+.archion-lightbox-close { position: absolute; top: 20px; right: 25px; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 1px solid rgba(255,255,255,.5); background: transparent; color: #fff; cursor: pointer; }
+.archion-reveal { opacity: 1; transform: none; }
+.archion-reveal.is-in-view { animation: archion-rise .8s cubic-bezier(.22,1,.36,1) both; }
+@keyframes archion-rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 1024px) {
+  .archion-desktop-header { display: none; }
+  .archion-mobile-header { position: relative; z-index: 30; display: flex; height: 70px; align-items: center; justify-content: space-between; padding: 0 5%; background: #fff; }
+  .archion-mobile-header .archion-wordmark { min-height: auto; color: #000 !important; font-size: 30px; }
+  .archion-mobile-menu { display: flex; width: 40px; height: 40px; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 0; border: 0; background: transparent; cursor: pointer; }
+  .archion-mobile-menu span { display: block; width: 22px; height: 1.5px; background: #000; }
+  .archion-mobile-nav { position: relative; z-index: 25; display: flex; flex-wrap: wrap; gap: 22px; padding: 12px 5% 20px; border-bottom: 1px solid #eee; background: #fff; }
+  .archion-mobile-nav a { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+  .archion-hero { height: 82svh; min-height: 560px; }
+  .archion-slide { padding: 0 5%; }
+  .archion-slide-copy { padding-top: 0; }
+  .archion-hero-bullets { left: 5%; bottom: 38px; }
+  .archion-hero-index { right: 5%; bottom: 36px; }
+  .archion-scroll-cue { right: 5%; bottom: 76px; }
+  .archion-intro { padding: 90px 5% 0; }
+  .archion-services { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 55px 30px; padding: 75px 5% 90px; }
+  .archion-service:nth-child(3) { grid-column: 1 / -1; max-width: 65%; }
+  .archion-product-section { padding: 75px 5% 85px; }
+  .archion-product-heading { gap: 28px; }
+  .archion-product-grid { grid-template-columns: 1fr; }
+  .archion-product-image { min-height: 430px; }
+  .archion-product-detail { max-width: 850px; width: 100%; margin: 0 auto; }
+  .archion-portfolio { padding: 75px 5% 70px; }
+  .archion-feature-header { grid-template-columns: 38px minmax(0,1fr) 24px; padding: 18px 20px; }
+  .archion-feature-meta { display: none; }
+  .archion-feature-copy { grid-template-columns: .55fr 1.45fr; }
+  .archion-feature-copy a { grid-column: 2; }
+  .archion-feature-gallery { gap: 18px; padding-right: 20px; padding-left: 20px; }
+  .archion-feature-gallery img { height: 220px; }
+  .archion-big-banner { min-height: 430px; padding: 90px 5%; }
+  .archion-footer { padding: 65px 5% 45px; }
+  .archion-footer-grid { grid-template-columns: 1fr 1fr; gap: 35px 20px; }
+  .archion-footer-intro { grid-column: 1 / -1; padding-bottom: 30px; border-bottom: 1px solid #ddd; }
+  .archion-footer-col + .archion-footer-col { padding-left: 20px; }
+  .archion-footer-col:nth-child(2) { padding-left: 0; border-left: 0; }
+}
+@media (max-width: 680px) {
+  .archion-mobile-nav { gap: 18px; }
+  .archion-hero { height: 78svh; min-height: 500px; }
+  .archion-slide { padding: 0 25px; }
+  .archion-slide-title { font-size: clamp(50px, 13vw, 76px); line-height: .96; letter-spacing: -.045em; }
+  .archion-slide-subtitle { max-width: 280px; margin-bottom: 36px; font-size: 12px; }
+  .archion-hero-bullets { left: 25px; bottom: 30px; }
+  .archion-hero-index { right: 25px; bottom: 27px; }
+  .archion-scroll-cue { right: 25px; bottom: 67px; font-size: 8px; }
+  .archion-intro { padding: 80px 25px 0; }
+  .archion-intro h2 { font-size: clamp(30px, 8.5vw, 42px); }
+  .archion-services { grid-template-columns: 1fr; gap: 45px; padding: 60px 25px 75px; }
+  .archion-service:nth-child(3) { grid-column: auto; max-width: 100%; }
+  .archion-service-icon { width: 65px; height: 65px; margin-bottom: 20px; }
+  .archion-product-section { padding: 65px 25px 70px; }
+  .archion-product-heading { grid-template-columns: 1fr; gap: 22px; margin-bottom: 30px; }
+  .archion-product-heading h2, .archion-portfolio-heading h2 { font-size: 39px; }
+  .archion-product-heading > p { font-size: 14px; }
+  .archion-product-grid { gap: 18px; }
+  .archion-product-image { min-height: 330px; }
+  .archion-workspace-top { padding: 13px; }
+  .archion-workspace-body { padding: 15px; }
+  .archion-workspace-stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .archion-workspace-stats > div:last-child { grid-column: 1 / -1; min-height: 90px; }
+  .archion-workspace-row { gap: 8px; padding: 12px 10px; }
+  .archion-workspace-row small { font-size: 9px; }
+  .archion-workspace-note { padding: 10px 13px; }
+  .archion-portfolio { padding: 60px 25px; }
+  .archion-portfolio-heading { margin-bottom: 30px; }
+  .archion-feature-header { grid-template-columns: 28px minmax(0,1fr) 20px; gap: 9px; padding: 17px 5px; }
+  .archion-feature-title { font-size: 19px; }
+  .archion-feature-copy { grid-template-columns: 1fr; gap: 12px; padding: 18px 5px 22px; }
+  .archion-feature-copy a { grid-column: auto; }
+  .archion-feature-gallery { flex-direction: column; gap: 16px; padding: 0 5px 22px; overflow: visible; }
+  .archion-feature-gallery button { width: 100%; }
+  .archion-feature-gallery img { height: auto; aspect-ratio: 4 / 3; }
+  .archion-big-banner { min-height: 360px; padding: 80px 25px; }
+  .archion-banner-copy { font-size: clamp(39px, 11vw, 58px); }
+  .archion-banner-copy p { margin-bottom: 27px; }
+  .archion-footer { padding: 60px 25px 35px; }
+  .archion-footer-grid { grid-template-columns: 1fr; gap: 35px; }
+  .archion-footer-intro { grid-column: auto; padding-bottom: 30px; }
+  .archion-footer-col, .archion-footer-col + .archion-footer-col { padding: 0; border: 0; }
+  .archion-footer-col h2 { font-size: 42px; }
+  .archion-copyright { padding-top: 18px; }
+  .archion-lightbox { padding: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .archion-home *, .archion-home *::before, .archion-home *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  .archion-slide, .archion-slide-title span, .archion-slide-subtitle { opacity: 1; transform: none; }
+}
