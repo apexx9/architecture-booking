@@ -600,7 +600,7 @@ input[type="time"]::-moz-focus-inner {
   .archion-desktop-header { display: none; }
   .archion-mobile-header { position: relative; z-index: 30; display: flex; height: 70px; align-items: center; justify-content: space-between; padding: 0 5%; background: #fff; }
   .archion-mobile-header .archion-wordmark { min-height: auto; color: #000 !important; font-size: 30px; }
-  .archion-mobile-menu { display: flex; width: 40px; height: 40px; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
+  .archion-mobile-menu { display: flex; width: 40px; height: 40px; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 0; border: 0; background: transparent; cursor: pointer; }
   .archion-mobile-menu span { display: block; width: 22px; height: 1.5px; background: #000; }
   .archion-mobile-nav { position: relative; z-index: 25; display: flex; flex-wrap: wrap; gap: 22px; padding: 12px 5% 20px; border-bottom: 1px solid #eee; background: #fff; }
   .archion-mobile-nav a { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
