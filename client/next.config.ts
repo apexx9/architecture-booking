@@ -2,15 +2,8 @@ import type { NextConfig } from "next";
 
 /*
  * `next dev` only allows `localhost`, its subdomains and the hostname it booted
- * with. Reaching the app through any other spelling of the loopback address
- * leaves the dev asset and HMR requests blocked, which stalls the client
- * bundle: the page paints its loading state and the auth bootstrap never runs,
- * so the app looks like a dead backend with nothing in either console.
- *
- * Only hostnames are matched, without scheme or port. A LAN address is not
- * listed here because it changes with the network; set NEXT_PUBLIC_DEV_ORIGINS
- * to a comma-separated list of hostnames to allow it, for example when testing
- * on a phone. This option has no effect outside development.
+ * with. Reaching the app through another spelling of loopback can block dev assets
+ * and HMR requests. Custom LAN hostnames can be added through NEXT_PUBLIC_DEV_ORIGINS.
  */
 const devOrigins = [
   "127.0.0.1",
@@ -23,8 +16,14 @@ const devOrigins = [
 const nextConfig: NextConfig = {
   allowedDevOrigins: devOrigins,
   images: {
-    qualities: [75, 90], // Add 90 to the allowed list
-    // ... other image configs
+    qualities: [75, 90],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+        pathname: "/**",
+      },
+    ],
   },
 };
 
