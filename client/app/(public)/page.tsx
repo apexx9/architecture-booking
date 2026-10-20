@@ -146,6 +146,7 @@ function WorkspaceConcept() {
 
 export default function Page() {
   const [activeSlide, setActiveSlide] = useState(0);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openFeature, setOpenFeature] = useState<number | null>(0);
   const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null);
 
@@ -188,11 +189,11 @@ export default function Page() {
       {/* Mobile version of the same header composition. */}
       <header className="archion-mobile-header">
         <Link href="/" className="archion-wordmark" aria-label="Renove home">renove<span>.</span></Link>
-        <a href="#mobile-menu" className="archion-mobile-menu" aria-label="Jump to page navigation"><span /><span /><span /></a>
+        <button type="button" onClick={() => setIsMobileMenuOpen((open) => !open)} className="archion-mobile-menu" aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"} aria-expanded={isMobileMenuOpen} aria-controls="mobile-menu"><span /><span /><span /></button>
       </header>
-      <nav id="mobile-menu" className="archion-mobile-nav" aria-label="Mobile menu">
-        <a href="#home">Home</a><a href="#services">Workflow</a><a href="#workspace">Workspace</a><a href="#contact">Contact</a>
-      </nav>
+      {isMobileMenuOpen && <nav id="mobile-menu" className="archion-mobile-nav" aria-label="Mobile menu">
+        <a href="#home" onClick={() => setIsMobileMenuOpen(false)}>Home</a><a href="#services" onClick={() => setIsMobileMenuOpen(false)}>Workflow</a><a href="#workspace" onClick={() => setIsMobileMenuOpen(false)}>Workspace</a><a href="#contact" onClick={() => setIsMobileMenuOpen(false)}>Contact</a>
+      </nav>}
 
       {/* Full-viewport hero slider, preserving the original Archion composition. */}
       <section id="home" data-nav-link="/" className="archion-hero" aria-label="Renove introduction">
