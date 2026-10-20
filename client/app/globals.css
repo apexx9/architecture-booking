@@ -1,6 +1,32 @@
 @import "tailwindcss";
 @import "./scroll-animations.css";
 
+/* Landing-page entrance motion: short, quiet, and respectful of reduced motion. */
+@keyframes home-enter {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 14px, 0);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .home-enter {
+        animation: home-enter 760ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .home-enter-1 {
+        animation-delay: 80ms;
+    }
+
+    .home-enter-2 {
+        animation-delay: 180ms;
+    }
+}
+
 /*
  * Renove colour system.
  *
@@ -114,9 +140,9 @@ body {
 /*
  * Modal dialog backdrop.
  *
- * In `@layer base` so a component can still override the backdrop colour with a
- * utility if it needs to. `open::backdrop` animates on entry; there is no exit
- * animation because `<dialog>` leaves the top layer the instant it closes, so
+ * In `@layer base` so a component can still override the backdrop colour with
+ * a utility if it needs to. `open::backdrop` animates on entry; there is no
+ * exit animation because `<dialog>` leaves the top layer the instant it closes, so
  * animating out would mean delaying the close, which is worse.
  */
 @layer base {
@@ -129,15 +155,6 @@ body {
     }
 }
 
-/*
- * Shared keyframes for the modal and toast primitives. Declared once here rather
- * than inside the components, so N dialogs do not emit N copies. `@keyframes` are
- * not subject to cascade layers, so these sit outside `@layer base`.
- *
- * `toast-in` is a short rise and fade, so a message reads as arriving from where
- * it was triggered rather than popping into an unrelated corner. The reduced-motion
- * guard below floors both durations without removing the state change.
- */
 @keyframes dialog-backdrop-in {
     from {
         opacity: 0;
@@ -158,17 +175,6 @@ body {
     }
 }
 
-/*
- * Global reduced-motion guard.
- *
- * Movement is an enhancement, never the only way something is communicated, so
- * when a visitor asks for reduced motion we shorten transitions rather than
- * removing the state change outright — an instant colour swap still reads as a
- * response, a silent one does not.
- *
- * Components can still opt out of specific effects with `motion-safe:`. This
- * rule only sets a floor.
- */
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -180,13 +186,7 @@ body {
         animation-iteration-count: 1 !important;
         scroll-behavior: auto !important;
     }
-}
 
-/*
- * Scroll-driven reveal animations are opt-in via `no-preference`, but anchor
- * navigation must never animate either.
- */
-@media (prefers-reduced-motion: reduce) {
     html:focus-within {
         scroll-behavior: auto;
     }
