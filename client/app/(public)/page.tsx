@@ -158,6 +158,23 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
+    const elements = document.querySelectorAll<HTMLElement>(".archion-reveal");
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      elements.forEach((element) => element.classList.add("is-in-view"));
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        entry.target.classList.add("is-in-view");
+        observer.unobserve(entry.target);
+      }
+    }, { threshold: 0.12, rootMargin: "0px 0px -4% 0px" });
+    elements.forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
     if (!lightbox) return;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setLightbox(null);
