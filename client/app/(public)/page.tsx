@@ -171,7 +171,7 @@ export default function Page() {
   }, [lightbox]);
 
   return (
-    <main className="archion-home">
+    <div className="archion-home">
       {/* Archion-inspired desktop header: transparent and layered over the hero. */}
       <header className="archion-desktop-header">
         <Link href="/" className="archion-wordmark" aria-label="Renove home">renove<span>.</span></Link>
@@ -289,7 +289,7 @@ export default function Page() {
       </footer>
 
       {lightbox && <div className="archion-lightbox" role="dialog" aria-modal="true" aria-label={lightbox.alt} onClick={() => setLightbox(null)}><button type="button" className="archion-lightbox-close" aria-label="Close image"><X size={24} /></button><Image src={lightbox.src} alt={lightbox.alt} width={1800} height={1200} sizes="95vw" onClick={(event) => event.stopPropagation()} /><span>{lightbox.alt}</span></div>}
-    </main>
+    </div>
   );
 }
 
